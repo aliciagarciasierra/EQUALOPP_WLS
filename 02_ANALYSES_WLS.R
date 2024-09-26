@@ -1,0 +1,265 @@
+
+
+###################################################################################
+###################### ANALYSES WLS   ###########################################
+###################################################################################
+
+#--------------  List of outcome variables
+
+outcome_vars <- c("education", "occupation_a", "occupation_b", "income_ind", 
+                  "income_hh", "wealth", "health_self", "health_illness")
+
+#-------------- Function to compute the main indexes 
+
+compute_indexes <- function(outcome_var, siblings) {
+  
+  # 1) NULL MODEL
+  m0 <- lmer(as.formula(paste(outcome_var, "~ 1 + (1 | familyID)")), data = siblings)
+  
+  vcov_m0 <- as.data.frame(VarCorr(m0))
+  emptyind <- vcov_m0[2, 4]
+  emptyfam <- vcov_m0[1, 4]
+  totalvar <- (vcov_m0[1, 4] + vcov_m0[2, 4])
+  
+  # 2) CONDITIONAL MODEL
+  m1 <- lmer(as.formula(paste(outcome_var, "~ 
+    (pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +  
+     pgi_depression + pgi_well_being + pgi_neuroticism)^2 + (1 | familyID)")), data = siblings)
+  
+  vcov_m1 <- as.data.frame(VarCorr(m1))
+  condind <- vcov_m1[2, 4]
+  condfam <- vcov_m1[1, 4]
+  
+  # 3) COMPLETE MODEL
+  m2 <- lmer(as.formula(paste(outcome_var, "~ 
+    (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
+    pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
+    pgi_depression + pgi_well_being + pgi_neuroticism + 
+    pc1cog+ pc2cog+ pc3cog+ pc4cog+ pc5cog+ pc6cog+ pc7cog+ pc8cog+ pc9cog+ pc10cog +
+    pc1noncog+ pc2noncog+ pc3noncog+ pc4noncog+ pc5noncog+ pc6noncog+ pc7noncog+ pc8noncog+ pc9noncog+ pc10noncog)^2 + 
+    (1 |familyID)")), data = siblings)
+  
+  vcov_m2 <- as.data.frame(VarCorr(m2))
+  completeind <- vcov_m2[2, 4]
+  completefam <- vcov_m2[1, 4]
+  
+  # Index computations
+  sibcorr <- emptyfam / totalvar
+  condcorr <- condfam / totalvar
+  w <- (condind - completeind) / totalvar
+  v <- (emptyind - completeind) / totalvar
+  
+  IOLIB <- w + condcorr
+  IORAD <- v + sibcorr
+  
+  # Create results data frame
+  result_df <- data.frame(
+    Outcome = outcome_var,
+    Model = c("NULL MODEL", "CONDITIONAL MODEL", "COMPLETE MODEL"),
+    emptyind = c(emptyind, NA, NA),
+    emptyfam = c(emptyfam, NA, NA),
+    totalvar = c(totalvar, NA, NA),
+    condind = c(NA, condind, NA),
+    condfam = c(NA, condfam, NA),
+    completeind = c(NA, NA, completeind),
+    completefam = c(NA, NA, completefam),
+    sibcorr = c(sibcorr, NA, NA),
+    condcorr = c(condcorr, NA, NA),
+    w = c(w, NA, NA),
+    v = c(v, NA, NA),
+    IOLIB = c(IOLIB, NA, NA),
+    IORAD = c(NA, NA, IORAD)
+  )
+  
+  return(result_df)
+}
+
+#---------------- Store the results from the main analyses
+
+# Initialize an empty list to store all results
+all_results <- list()
+
+# Loop over each outcome variable
+for (outcome in outcome_vars) {
+  result <- compute_indexes(outcome, siblings)
+  
+  # Append results to the cumulative list
+  all_results[[outcome]] <- result
+}
+
+# Convert the list to a single data frame
+final_results <- do.call(rbind, all_results)
+
+#---------- Function to compute confidence intervals through bootsrapping
+
+compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_var, results) {
+  fit_model_and_compute_indexes <- function(bootstrap_data, indices) {
+    # Subset the data for this bootstrap sample
+    data_sample <- bootstrap_data[indices, ]
+    
+    # Compute the models and the statistics (similar to compute_indexes function)
+    m0 <- lmer(as.formula(paste(outcome_var, "~ 1 + (1 | familyID)")), data = data_sample)
+    m1 <- lmer(as.formula(paste(outcome_var, "~ 
+      (pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +  
+      pgi_depression + pgi_well_being + pgi_neuroticism)^2 + (1 | familyID)")), data = data_sample)
+    m2 <- lmer(as.formula(paste(outcome_var, "~ 
+      (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
+      pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
+      pgi_depression + pgi_well_being + pgi_neuroticism + 
+      pc1cog+ pc2cog+ pc3cog+ pc4cog+ pc5cog+ pc6cog+ pc7cog+ pc8cog+ pc9cog+ pc10cog +
+      pc1noncog+ pc2noncog+ pc3noncog+ pc4noncog+ pc5noncog+ pc6noncog+ pc7noncog+ pc8noncog+ pc9noncog+ pc10noncog)^2 + 
+      (1 |familyID)")), data = data_sample)
+    
+    # Extract variance components
+    vcov_m0 <- as.data.frame(VarCorr(m0))
+    vcov_m1 <- as.data.frame(VarCorr(m1))
+    vcov_m2 <- as.data.frame(VarCorr(m2))
+    
+    # Perform your index computations (same as in compute_indexes)
+    emptyind <- vcov_m0[2, 4]
+    emptyfam <- vcov_m0[1, 4]
+    totalvar <- emptyfam + emptyind
+    
+    condind <- vcov_m1[2, 4]
+    condfam <- vcov_m1[1, 4]
+    
+    completeind <- vcov_m2[2, 4]
+    completefam <- vcov_m2[1, 4]
+    
+    sibcorr <- emptyfam / totalvar
+    condcorr <- condfam / totalvar
+    w <- (condind - completeind) / totalvar
+    v <- (emptyind - completeind) / totalvar
+    
+    IOLIB <- w + condcorr
+    IORAD <- v + sibcorr
+    
+    # Return a numeric vector with the key statistics
+    return(c(IOLIB, IORAD, sibcorr))
+  }
+  
+  # Run the bootstrapping
+  bootstrap_results <- boot(data, fit_model_and_compute_indexes, R = num_bootstrap_samples)
+  
+  # Calculate standard errors for the bootstrapped estimates
+  se_iolib <- sd(bootstrap_results$t[, 1])  # Index 1 for IOLIB
+  se_iorad <- sd(bootstrap_results$t[, 2])  # Index 2 for IORAD
+  se_sibcorr <- sd(bootstrap_results$t[, 3])  # Index 3 for sibcorr
+  
+  # Calculate confidence intervals
+  upcilib <- as.numeric(results$IOLIB[1]) + 1.96 * se_iolib
+  bottomcilib <- as.numeric(results$IOLIB[1]) - 1.96 * se_iolib
+  upcirad <- as.numeric(results$IORAD[3]) + 1.96 * se_iorad
+  bottomcirad <- as.numeric(results$IORAD[3]) - 1.96 * se_iorad
+  upcisib <- as.numeric(results$sibcorr[1]) + 1.96 * se_sibcorr
+  bottomcisib <- as.numeric(results$sibcorr[1]) - 1.96 * se_sibcorr
+  
+  # Return confidence intervals
+  cis <- matrix(c(upcilib, upcirad, upcisib, bottomcilib, bottomcirad, bottomcisib), nrow = 3, ncol = 2)
+  rownames(cis) <- c("Liberal", "Radical", "Sibling correlation")
+  colnames(cis) <- c("Upper", "Lower")
+  
+  return(cis)
+}
+
+# Create a second data frame for the confidence intervals
+ci_summary <- data.frame(
+  Index = character(),
+  Lower = numeric(),
+  Upper = numeric(),
+  Estimate = numeric(),
+  Outcome = character(),
+  stringsAsFactors = FALSE
+)
+
+# Compute bootstrapping confidence intervals for all outcomes
+bootstrap_results_list <- list()
+for (outcome in outcome_vars) {
+  outcome_results <- all_results[[outcome]]
+  bootstrap_results <- compute_indexes_bootstrap(siblings, num_bootstrap_samples = 50, outcome_var = outcome, results = outcome_results)
+  bootstrap_results_list[[outcome]] <- bootstrap_results
+  
+  # Get coefficients from the results
+  iolib <- (outcome_results$IOLIB[1])  # Assuming IOLIB is in the first row for the outcome
+  iorad <- (outcome_results$IORAD[3])   # Assuming IORAD is in the third row
+  sibcorr <- (outcome_results$sibcorr[1])  # Assuming sibcorr is in the first row
+  
+  # Populate the ci_summary data frame
+  ci_summary <- rbind(ci_summary, 
+                      data.frame(Index = "IOLIB", Lower = bootstrap_results["Liberal", "Lower"], Upper = bootstrap_results["Liberal", "Upper"], Estimate = iolib, Outcome = outcome),
+                      data.frame(Index = "IORAD", Lower = bootstrap_results["Radical", "Lower"], Upper = bootstrap_results["Radical", "Upper"], Estimate = iorad, Outcome = outcome),
+                      data.frame(Index = "Sibcorr", Lower = bootstrap_results["Sibling correlation", "Lower"], Upper = bootstrap_results["Sibling correlation", "Upper"], Estimate = sibcorr, Outcome = outcome))
+}
+
+# Remove confidence intervals from the final_results
+final_results <- final_results[ , !names(final_results) %in% c("CI_Upper_IOLIB", "CI_Lower_IOLIB", 
+                                                               "CI_Upper_IORAD", "CI_Lower_IORAD",
+                                                               "CI_Upper_Sibcorr", "CI_Lower_Sibcorr")]
+
+#----------------Store bootstrapping results
+
+# Create a new Excel workbook
+wb <- createWorkbook()
+
+# Add results sheet
+addWorksheet(wb, "Full results")
+writeData(wb, "Full results", final_results)
+
+# Add confidence intervals sheet
+addWorksheet(wb, "For plotting")
+writeData(wb, "For plotting", ci_summary)
+
+# Save the workbook to an Excel file
+saveWorkbook(wb, "full_results.xlsx", overwrite = TRUE)
+
+
+
+#---------------- Plot the graph
+
+# Read the data 
+data_graph <- read_excel("full_results.xlsx", sheet = "For plotting")
+
+# Set theme 
+set_pilot_family("Avenir Next Medium", title_family = "Avenir Next Demi Bold")
+
+# Custom order 
+custom_order <- c("Sibcorr","IOLIB", "IORAD")
+custom_order2<-c("education", "occupation_a", "occupation_b", "income_ind", "income_hh", "wealth", "health_self", "health_illness")
+
+data_graph$Index <- factor(data_graph$Index, levels = custom_order)
+data_graph$Outcome <- factor(data_graph$Outcome, levels = custom_order2)
+
+# Create the bar graph
+  # Main elements
+ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), 
+                position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
+  labs(title = " ", x = " ", y = " ") +
+  geom_text(aes(label = round(Estimate, 2)), position = position_dodge(width = 1), vjust =-1.5 ,hjust=-0.1) + 
+  
+  # Add labels
+  scale_x_discrete(labels = c("education" = "Education", 
+                              "occupation_a" = "Occup Duncan", 
+                              "occupation_b" = "Occup Nakao-Treas", 
+                              "income_ind" = "Income Ind", 
+                              "income_hh" = "Income HH", 
+                              "wealth" = "Wealth", 
+                              "health_self" = "Health Self-Rep", 
+                              "health_illness" = "Health N Illnesses")) +
+  scale_fill_discrete(labels = c("Sibcorr" = "Sibling correlation", 
+                                 "IOLIB" = "Liberal IOP", 
+                                 "IORAD" = "Radical IOP")) +
+  # Theme
+  guides(fill = guide_legend(title = NULL)) +
+  theme_pilot(axis_title_size = 14,
+              axis_text_size = 13,
+              legend_text_size = 13,
+              legend_title_size = 13,
+              legend_position = "right")
+
+# Save the plot
+ggsave("results_plot.png", width = 10, height = 6, dpi = 300)
+
+
+
