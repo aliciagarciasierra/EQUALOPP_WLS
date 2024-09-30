@@ -6,8 +6,8 @@
 
 #--------------  List of outcome variables
 
-outcome_vars <- c("education", "occupation_a", "occupation_b", "income_ind", 
-                  "income_hh", "wealth", "health_self", "health_illness")
+outcome_vars <- c("education", "occupation","income_ind", 
+                  "income_hh", "wealth", "health_self", "health_illness", "health_pc")
 
 #-------------- Function to compute the main indexes 
 
@@ -224,7 +224,7 @@ set_pilot_family("Avenir Next Medium", title_family = "Avenir Next Demi Bold")
 
 # Custom order 
 custom_order <- c("Sibcorr","IOLIB", "IORAD")
-custom_order2<-c("education", "occupation_a", "occupation_b", "income_ind", "income_hh", "wealth", "health_self", "health_illness")
+custom_order2<-c("education", "occupation", "income_ind", "income_hh", "wealth", "health_self", "health_illness")
 
 data_graph$Index <- factor(data_graph$Index, levels = custom_order)
 data_graph$Outcome <- factor(data_graph$Outcome, levels = custom_order2)
@@ -240,8 +240,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   
   # Add labels
   scale_x_discrete(labels = c("education" = "Education", 
-                              "occupation_a" = "Occup Duncan", 
-                              "occupation_b" = "Occup Nakao-Treas", 
+                              "occupation" = "Occupation", 
                               "income_ind" = "Income Ind", 
                               "income_hh" = "Income HH", 
                               "wealth" = "Wealth", 

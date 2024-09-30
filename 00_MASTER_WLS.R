@@ -37,6 +37,8 @@ library(ggplot2)
 library(pilot)
 library(dplyr)
 library(ggpubr)
+library(viridis)  
+library(missMDA)
 
 # SET WD 
 

@@ -55,22 +55,20 @@ data <- data %>%
 
 ########################## OUTCOMES ######################################
 
-# Check which education variable as fewer missing cases 
-
+# Check missing cases in the educational variables
 missing_summary <- data %>%
   summarise(
     valid_yoe_1 = sum(!is.na(z_edeqyr)), # R03 Equivalent years of regular education.
     valid_yoe_2 = sum(!is.na(z_rb004red)), # R04 Summary of equivalent yrs of regular education based on most recent degree.
     valid_yoe_3 = sum(!is.na(z_gb103red)), # R05 How many years of education does R have based on his or her highest degree?
-    valid_yoe_4 = sum(!is.na(z_hb103red)) #R06 Summary of equivalent years of regular education based on highest degree.
+    valid_yoe_4 = sum(!is.na(z_mx001rer)) #R06 Summary of equivalent years of regular education based on highest degree.
   )
 
-# Select and rename
+# Rename
 data <- data %>%
   mutate(
     education_1 = z_edeqyr, education_2= z_rb004red, education_3= z_gb103red, education_4= z_hb103red  ,# years of education (variables with the highest number of valid cases across cohorts)
     occu_3 = z_ocsx1u2 , occu_4 = z_rcu22sp, # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
-    occu_5 = z_gf018jcf , occu_6 = z_hf018j1e, # occupation (measured as 1989 Nakao-Treas Prestige Rating)
     income_ind_5 = z_gp250rec, income_ind_6 = z_hpu50rec,  # individual level income (total personal income)
     income_hh_5 = z_gp260hec, income_hh_6 = z_hpu60hec, # household level income (total household income)
     wealth_4 = z_rr043rec, wealth_5 = z_gr100rpc, # wealth (net worth at the family level)
@@ -82,7 +80,7 @@ data <- data %>%
 # Clean (sending negative values to NA)
 data <- data %>%
   mutate_at(vars(education_1, education_2, education_3, education_4, 
-                 occu_3, occu_4,
+                 occu_3, 
                  income_ind_5, income_ind_6, income_hh_5, income_hh_6, 
                  wealth_4, wealth_5, 
                  health_self_4, health_self_5, health_self_6, health_self_7,
@@ -94,8 +92,7 @@ data <- data %>%
 data <- data %>%
   mutate(
     education=rowMeans(cbind(education_1, education_2, education_3, education_4), na.rm=TRUE),
-    occupation_a = rowMeans(cbind(occu_3, occu_4), na.rm=TRUE),
-    occupation_b = rowMeans(cbind(occu_5, occu_6), na.rm=TRUE),
+    occupation = rowMeans(cbind(occu_3, occu_4), na.rm=TRUE),
     income_ind = rowMeans(cbind(income_ind_5, income_ind_6), na.rm=TRUE),
     income_hh = rowMeans(cbind(income_hh_5, income_hh_6), na.rm=TRUE),
     wealth = rowMeans(cbind(wealth_4, wealth_5), na.rm=TRUE),
@@ -103,7 +100,25 @@ data <- data %>%
     health_illness = rowMeans(cbind(health_illness_4, health_illness_5, health_illness_6), na.rm=TRUE),
     health_hospital = rowMeans(cbind(health_hospital_4, health_hospital_5), na.rm=TRUE)
     )
-    
+
+# Principal components for the combined health variable
+
+pcdata <- data %>% # extract variables 
+  select(ID, health_self_4, health_illness_4, health_hospital_4)
+
+nb_comp <- estim_ncpPCA(pcdata %>% select(-ID)) 
+pca_result <- imputePCA(pcdata %>% select(-ID), ncp = nb_comp$ncp)  # PCA with missing data imputation
+
+pcdata <- pcdata %>%
+  mutate(health_pc = pca_result$completeObs[, 1]) %>% # extract the first principal component (PC1) and center it
+  mutate(health_pc = health_pc - mean(health_pc))
+
+pcdata <- pcdata %>%
+  select(ID, health_pc)
+
+# Merge with the original data
+data <- merge(data, pcdata, by = "ID", all.x = TRUE)
+
 ########################## PGIs cognitive ######################################
 
 # Relabel and select the variables of interest
@@ -113,8 +128,8 @@ pgi_cog<- pgi_cog %>%
   )%>%
   select(
     pgiID,
-    pgi_education = pgs_ea3_mtag,
-    pgi_cognitive = pgs_cp_mtag,
+    pgi_education = pgs_ea3_gwas,
+    pgi_cognitive = pgs_cp_gwas,
     pgi_math_exam = pgs_hm_mtag,
     pgi_math_ability = pgs_ma_mtag,
     pc1cog = pc1_shuffled,
@@ -143,9 +158,9 @@ pgi_noncog<- pgi_noncog %>%
   )%>%
   select(
     pgiID,
-    pgi_depression = pgs_dep_mtag,
-    pgi_neuroticism = pgs_neur_mtag,
-    pgi_well_being = pgs_swb_mtag,
+    pgi_depression = pgs_dep_gwas,
+    pgi_neuroticism = pgs_neur_gwas,
+    pgi_well_being = pgs_swb_gwas,
     pc1noncog = pc1_shuffled,
     pc2noncog = pc2_shuffled,
     pc3noncog = pc3_shuffled,
@@ -170,10 +185,10 @@ siblings <- data%>%
   select(ID, familyID, withinID, # IDs
          sex, birth_year, mother_age_birth, father_age_birth, birth_order,  # demographics 
          education, # education
-         occupation_a, occupation_b, # occupation
+         occupation, # occupation
          income_ind, income_hh, #income
          wealth, #wealth
-         health_self, health_illness, health_hospital, #health
+         health_self, health_illness, health_pc, #health
          pgiID, pgi_education, pgi_cognitive, pgi_math_exam, pgi_math_ability, # PGIs cog
          pgi_depression, pgi_well_being, pgi_neuroticism, # PGIs noncog
          pc1cog, pc2cog, pc3cog, pc4cog, pc5cog, pc6cog, pc7cog, pc8cog, pc9cog, pc10cog, # principal components cog
@@ -183,6 +198,9 @@ siblings <- data%>%
 # Label NAs rightly
 siblings <- siblings %>%
   mutate(across(everything(), ~ ifelse(is.nan(.), NA, .)))  # Applies to all columns
+
+# There are four cases that are not labelled properly and show 3 or 4 siblings, delete them
+siblings<- siblings[!(siblings$withinID %in% c(3, 4)), ]
 
 # Find those families who have siblings
 filter<- siblings%>% 
@@ -196,15 +214,11 @@ siblings <- siblings%>%
   filter(familyID %in% unique(filter$familyID))
 
 # Count unique observations
-
-n_distinct(siblings$ID) # 4148
-n_distinct(siblings$familyID) # 2071
-
+n_distinct(siblings$ID) # 4140
+n_distinct(siblings$familyID) # 2070
+ 
 # If we want to select only complete observations it would be...
-# siblings<-siblings[complete.cases(siblings),] #2697 cases, nested in 1834 families
-
-
-
+siblings<-siblings[complete.cases(siblings),] #3313 cases, nested in 1970 families
 
 ####################--------  JUST IN CASE PARENTING -------- #################################
 
