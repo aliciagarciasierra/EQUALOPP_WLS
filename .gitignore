@@ -1,2 +1,7 @@
-wls_bl_14_03.dta
-Lee_idpub_shuffled.dta
+# exclude everything
+data/*
+
+# exception to the rule
+!data/.gitkeep 
+
+.DS_Store
