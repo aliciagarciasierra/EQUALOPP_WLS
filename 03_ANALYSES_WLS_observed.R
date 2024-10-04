@@ -24,9 +24,8 @@ compute_indexes <- function(outcome_var, siblings) {
   totalvar <- (vcov_m0[1, 4] + vcov_m0[2, 4])
   
   # 2) CONDITIONAL MODEL
-  m1 <- lmer(as.formula(paste(outcome_var, "~ 
-    (pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +  
-     pgi_depression + pgi_well_being + pgi_neuroticism)^2 + (1 | familyID)")), data = siblings)
+  m1 <- lmer(as.formula(paste(outcome_var, "~ (",  
+        paste(OBSERVED_COG, collapse=" + ")," + ", paste(OBSERVED_NON_COG, collapse=" + ") ,")^2 + (1 | familyID)")), data = siblings)
   
   vcov_m1 <- as.data.frame(VarCorr(m1))
   condind <- vcov_m1[2, 4]
@@ -34,12 +33,8 @@ compute_indexes <- function(outcome_var, siblings) {
   
   # 3) COMPLETE MODEL
   m2 <- lmer(as.formula(paste(outcome_var, "~ 
-    (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
-    pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
-    pgi_depression + pgi_well_being + pgi_neuroticism + 
-    pc1cog+ pc2cog+ pc3cog+ pc4cog+ pc5cog+ pc6cog+ pc7cog+ pc8cog+ pc9cog+ pc10cog +
-    pc1noncog+ pc2noncog+ pc3noncog+ pc4noncog+ pc5noncog+ pc6noncog+ pc7noncog+ pc8noncog+ pc9noncog+ pc10noncog)^2 + 
-    (1 |familyID)")), data = siblings)
+    (birth_year + birth_order + sex + mother_age_birth + father_age_birth  +",  
+     paste(OBSERVED_COG, collapse=" + ")," + ", paste(OBSERVED_NON_COG, collapse=" + ") ,")^2 + (1 |familyID)")), data = siblings)
   
   vcov_m2 <- as.data.frame(VarCorr(m2))
   completeind <- vcov_m2[2, 4]
@@ -93,9 +88,11 @@ compute_indexes <- function(outcome_var, siblings) {
 #final_results <- do.call(rbind, all_results)
 
 
+print("compute main results")
 # -- convert to lapply
-all_results   <- mclapply(OUTCOMES, compute_indexes, siblings=siblings, mc.cores = 4)
+all_results   <- lapply(OUTCOMES, compute_indexes, siblings=siblings)
 final_results <- do.call(rbind.data.frame, all_results)
+
 
 
 
@@ -108,16 +105,12 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
     
     # Compute the models and the statistics (similar to compute_indexes function)
     m0 <- lmer(as.formula(paste(outcome_var, "~ 1 + (1 | familyID)")), data = data_sample)
-    m1 <- lmer(as.formula(paste(outcome_var, "~ 
-      (pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +  
-      pgi_depression + pgi_well_being + pgi_neuroticism)^2 + (1 | familyID)")), data = data_sample)
+    m1 <- lmer(as.formula(paste(outcome_var, "~ (",  
+               paste(OBSERVED_COG, collapse=" + ")," + ", paste(OBSERVED_NON_COG, collapse=" + ") ,")^2 + (1 | familyID)")), data = siblings)
+    
     m2 <- lmer(as.formula(paste(outcome_var, "~ 
-      (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
-      pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
-      pgi_depression + pgi_well_being + pgi_neuroticism + 
-      pc1cog+ pc2cog+ pc3cog+ pc4cog+ pc5cog+ pc6cog+ pc7cog+ pc8cog+ pc9cog+ pc10cog +
-      pc1noncog+ pc2noncog+ pc3noncog+ pc4noncog+ pc5noncog+ pc6noncog+ pc7noncog+ pc8noncog+ pc9noncog+ pc10noncog)^2 + 
-      (1 |familyID)")), data = data_sample)
+    (birth_year + birth_order + sex + mother_age_birth + father_age_birth  +",  
+     paste(OBSERVED_COG, collapse=" + ")," + ", paste(OBSERVED_NON_COG, collapse=" + ") ,")^2 + (1 |familyID)")), data = siblings)
     
     # Extract variance components
     vcov_m0 <- as.data.frame(VarCorr(m0))
@@ -171,10 +164,40 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
   return(cis)
 }
 
+# Create a second data frame for the confidence intervals
+#ci_summary <- data.frame(
+#  Index = character(),
+#  Lower = numeric(),
+#  Upper = numeric(),
+#  Estimate = numeric(),
+#  Outcome = character(),
+#  stringsAsFactors = FALSE
+#)
+#
+## Compute bootstrapping confidence intervals for all outcomes
+#bootstrap_results_list <- list()
+#for (outcome in OUTCOMES) {
+#  outcome_results <- all_results[[outcome]]
+#  bootstrap_results <- compute_indexes_bootstrap(siblings, num_bootstrap_samples = 50, outcome_var = outcome, results = outcome_results)
+#  bootstrap_results_list[[outcome]] <- bootstrap_results
+#  
+#  # Get coefficients from the results
+#  iolib <- (outcome_results$IOLIB[1])  # Assuming IOLIB is in the first row for the outcome
+#  iorad <- (outcome_results$IORAD[3])   # Assuming IORAD is in the third row
+#  sibcorr <- (outcome_results$sibcorr[1])  # Assuming sibcorr is in the first row
+#  
+#  # Populate the ci_summary data frame
+#  ci_summary <- rbind(ci_summary, 
+#                      data.frame(Index = "IOLIB", Lower = bootstrap_results["Liberal", "Lower"], Upper = bootstrap_results["Liberal", "Upper"], Estimate = iolib, Outcome = outcome),
+#                      data.frame(Index = "IORAD", Lower = bootstrap_results["Radical", "Lower"], Upper = bootstrap_results["Radical", "Upper"], Estimate = iorad, Outcome = outcome),
+#                      data.frame(Index = "Sibcorr", Lower = bootstrap_results["Sibling correlation", "Lower"], Upper = bootstrap_results["Sibling correlation", "Upper"], Estimate = sibcorr, Outcome = outcome))
+#}
 
 
 
 # -- convert to lapply --
+
+print("compute bootstrapping")
 
 start = Sys.time()
 ci_list <- mclapply(OUTCOMES, function(outcome) {
@@ -198,11 +221,13 @@ print(paste0(round(as.numeric(difftime(as.POSIXct(stop), as.POSIXct(start), unit
 ci_summary <- do.call(rbind.data.frame, ci_list)
 
 
-
 # Remove confidence intervals from the final_results
 final_results <- final_results[ , !names(final_results) %in% c("CI_Upper_IOLIB", "CI_Lower_IOLIB", 
                                                                "CI_Upper_IORAD", "CI_Lower_IORAD",
                                                                "CI_Upper_Sibcorr", "CI_Lower_Sibcorr")]
+
+
+
 
 #----------------Store bootstrapping results
 
@@ -218,14 +243,17 @@ addWorksheet(wb, "For plotting")
 writeData(wb, "For plotting", ci_summary)
 
 # Save the workbook to an Excel file
-saveWorkbook(wb, "results/full_results.xlsx", overwrite = TRUE)
+saveWorkbook(wb, paste0("results/full_results_",OBSERVED_COG,".xlsx"), overwrite = TRUE)
+
+
+
 
 
 
 #---------------- Plot the graph
 
 # Read the data 
-data_graph <- read_excel("results/full_results.xlsx", sheet = "For plotting")
+data_graph <- read_excel(paste0("results/full_results_",OBSERVED_COG,".xlsx"), sheet = "For plotting")
 
 # Set theme 
 set_pilot_family("Avenir Next Medium", title_family = "Avenir Next Demi Bold")
@@ -245,9 +273,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   
   # Add labels
   scale_x_discrete(labels = OUTCOMES.labs) +
-  scale_fill_discrete(labels = c("Sibcorr" = "Sibling correlation", 
-                                 "IOLIB" = "Liberal IOP", 
-                                 "IORAD" = "Radical IOP")) +
+  scale_fill_discrete(labels = INDICES.labs) +
   # Theme
   guides(fill = guide_legend(title = NULL)) +
   theme_bw()
@@ -256,13 +282,9 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   #            legend_text_size = 13,
   #            legend_title_size = 13,
   #            legend_position = "right")
-
+#
 # Save the plot
-ggsave("plots/results_plot.png", width = 13, height = 6, dpi = 300)
-
-
-
-
+ggsave(paste0("plots/results_plot_",OBSERVED_COG,".png"), width = 13, height = 6, dpi = 300)
 
 
 

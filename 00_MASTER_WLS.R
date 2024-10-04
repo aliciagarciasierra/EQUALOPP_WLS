@@ -37,16 +37,56 @@ library(ggplot2)
 library(pilot)
 library(dplyr)
 library(ggpubr)
-library(viridis)  
 library(missMDA)
+library(parallel)
+
+`%!in%` <- function(x, y) !(x %in% y)
+
 
 # SET WD 
 
-setwd("/Users/agarcias/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/data")
+#setwd("/Users/spetrini/Library/Mobile Documents/com~apple~CloudDocs/University/UNIL/projects/Inequality-Across-Families-and-PGIs/WLS/EQUALOPP_WLS")
 
-# OPEN RAW DATA
 
-data <- read_dta("wls_bl_14_03.dta") # main dataset
-pgi_cog<- read_dta("Lee_idpub_shuffled.dta") # PGIs cognitive
-pgi_noncog <- read_dta("Turley_idpub_shuffled.dta") # PGIs non-cognitive
+# OPEN RAW DATA (first time)
+
+#data <- read_dta("data/wls_bl_14_03.dta") # main dataset
+#pgi_cog <- read_dta("data/Lee_idpub_shuffled.dta") # PGIs cognitive
+#pgi_noncog <- read_dta("data/Turley_idpub_shuffled.dta") # PGIs non-cognitive
+
+
+# SAVE IN RDA (for faster read following times)
+
+#saveRDS(data, file = "data/data.rds")
+#saveRDS(pgi_cog, file = "data/pgi_cog.rds")
+#saveRDS(pgi_noncog, file = "data/pgi_noncog.rds")
+
+
+
+
+# GLOBALS 
+INDICES <- c("Sibcorr","IOLIB", "IORAD")
+INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "IORAD" = "Radical IOP")
+stopifnot(names(INDICES.labs) == INDICES)
+
+OUTCOMES <- c("education", "occupation","income_ind", 
+                  "income_hh", "wealth", "health_self", "health_illness", "health_pc")
+OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
+  "income_ind" = "Income Ind", "income_hh" = "Income HH", 
+  "wealth" = "Wealth", "health_self" = "Health Self-Rep", 
+  "health_illness" = "Health N Illnesses", "health_pc" = "Health PC")
+stopifnot(names(OUTCOMES.labs) == OUTCOMES)
+
+OBSERVED_NON_COG <- c("extraversion", "openness", "neuroticism", "conscientiousness", "agreeableness")
+OBSERVED_COG <- "IQ"
+OBSERVED_COG <- "centile_rank_IQ"
+ABILITY_DEFS <- c("polygenic indices", "observed ability")
+
+
+# settings
+n_boot <- 50
+
+
+
+
 

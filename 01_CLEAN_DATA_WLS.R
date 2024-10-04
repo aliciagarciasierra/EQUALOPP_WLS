@@ -4,6 +4,12 @@
 ###################### DATA CLEANING AND RESHAPING #################
 #####################################################################
 
+# FAST READ FROM RDS
+
+data       <- readRDS("data/data.rds")
+pgi_cog    <- readRDS("data/pgi_cog.rds")
+pgi_noncog <- readRDS("data/pgi_noncog.rds")
+
 
 ############################ IDENTIFIERS ########################
 
@@ -178,10 +184,72 @@ pgi_noncog<- pgi_noncog %>%
 data <-merge(data, pgi_noncog, by="pgiID", all.y=TRUE)
 
 
+
+########################## OBSERVED ABILITY non-cognitive ##########################
+
+# check valids
+valid_summary <- data %>%
+  summarise(
+    valid_extra_1 = sum(!is.na(z_rh001rec)), # collected by phone
+    valid_openn_1 = sum(!is.na(z_rh003rec)), # collected by phone
+    valid_neuro_1 = sum(!is.na(z_rh005rec)), # collected by phone
+    valid_consc_1 = sum(!is.na(z_rh007rec)), # collected by phone
+    valid_agree_1 = sum(!is.na(z_rh009rec)), # collected by phone
+    
+    valid_extra_2 = sum(!is.na(z_mh001rec)), # collected by mail
+    valid_openn_2 = sum(!is.na(z_mh032rec)), # collected by mail
+    valid_neuro_2 = sum(!is.na(z_mh025rec)), # collected by mail
+    valid_consc_2 = sum(!is.na(z_mh017rec)), # collected by mail
+    valid_agree_2 = sum(!is.na(z_mh009rec))  # collected by mail
+  )
+
+valid_summary 
+# use collected by phone in wave 4
+
+# Rename
+data <- data %>% rename(extraversion      = z_rh001rec, openness      = z_rh003rec, neuroticism = z_rh005rec, 
+                        conscientiousness = z_rh007rec, agreeableness = z_rh009rec)
+
+# Clean (sending negative values to NA)
+data <- data %>%
+  mutate_at(vars(any_of(OBSERVED_NON_COG)),
+            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
+
+# check distributions
+summary(select(data, any_of(OBSERVED_NON_COG)))
+
+
+########################## OBSERVED ABILITY cognitive ##########################
+
+# check valids
+valid_summary <- data %>%
+  summarise(
+    total_cognition_grad_4 = sum(!is.na(ri001re)), # 
+    total_cognition_sib_4  = sum(!is.na(si001re)), # 
+    cog_test               = sum(!is.na(z_gwiiq_bm)), # Adolescent cognitive test score
+    centile_rank_cog_test  = sum(!is.na(z_ghncr_bm)), # Centile rank based on national test takers for Henmon-Nelson test score from junior year
+    
+  )
+
+valid_summary 
+# use collected by phone
+
+# Rename
+data <- data %>% rename(IQ = z_gwiiq_bm, centile_rank_IQ = z_ghncr_bm)
+
+# Clean (sending negative values to NA)
+data <- data %>%
+  mutate_at(vars(IQ, centile_rank_IQ),
+            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
+
+# check distributions
+summary(select(data, IQ, centile_rank_IQ))
+
+
 ########################## SELECT FINAL SAMPLE ##########################
 
 # Select all the relevant variables to extract them from the sample
-siblings <- data%>%
+siblings <- data %>%
   select(ID, familyID, withinID, # IDs
          sex, birth_year, mother_age_birth, father_age_birth, birth_order,  # demographics 
          education, # education
@@ -193,6 +261,7 @@ siblings <- data%>%
          pgi_depression, pgi_well_being, pgi_neuroticism, # PGIs noncog
          pc1cog, pc2cog, pc3cog, pc4cog, pc5cog, pc6cog, pc7cog, pc8cog, pc9cog, pc10cog, # principal components cog
          pc1noncog, pc2noncog, pc3noncog, pc4noncog, pc5noncog, pc6noncog, pc7noncog, pc8noncog, pc9noncog, pc10noncog, # principal components non-cog
+         IQ, centile_rank_IQ, any_of(OBSERVED_NON_COG) # observed abilities
          )
 
 # Label NAs rightly
@@ -218,7 +287,16 @@ n_distinct(siblings$ID) # 4140
 n_distinct(siblings$familyID) # 2070
  
 # If we want to select only complete observations it would be...
-siblings<-siblings[complete.cases(siblings),] #3313 cases, nested in 1970 families
+siblings<-siblings[complete.cases(siblings),] 
+#3313 cases, nested in 1970 families
+#2729 cases, nested in 1852 families (with observed abilities)
+
+
+saveRDS(siblings, file = "data/siblings.rds")
+
+
+
+
 
 ####################--------  JUST IN CASE PARENTING -------- #################################
 
