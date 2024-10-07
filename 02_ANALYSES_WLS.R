@@ -259,7 +259,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
 
 # Save the plot
 ggsave("plots/results_plot_PGI.pdf", width = 13, height = 6, dpi = 300)
-
+pdf(NULL)
 
 
 
