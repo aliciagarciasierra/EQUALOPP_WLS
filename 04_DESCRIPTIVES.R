@@ -44,8 +44,9 @@ sapply(pgis, function(pgi){
 
 
 ####################################################################
-################## FIGURE 2: PGI vs OBSERVED ##############################
+################## FIGURE 2: PGI vs OBSERVED #######################
 ####################################################################
+
 
 datas <- lapply(ABILITY_DEFS, function(ability) {
   name <- switch(ability, "polygenic indices"="", "observed ability"=paste0("_",OBSERVED_COG))
@@ -58,6 +59,9 @@ data_graph <- do.call(rbind, datas)
 data_graph$Index   <- factor(data_graph$Index, levels = INDICES)
 data_graph$Outcome <- factor(data_graph$Outcome, levels = OUTCOMES)
 data_graph$Ability <- factor(data_graph$Ability, levels = ABILITY_DEFS)
+
+
+# - version 1
 
 # Define grouping for splitting outcomes and create two plots
 groups <- cut(1:length(OUTCOMES), 2, labels = FALSE)
@@ -87,17 +91,32 @@ lapply(1:2, function(group) {
     
     # Other
     facet_grid(Outcome ~ Ability, labeller = labeller(Outcome = OUTCOMES.labs)) +
-    ylim(-0.15,0.6)
+    ylim(-0.09,0.6)
   
   ggsave(paste0("plots/comparison_",group,".png"), width = 6, height = 8, dpi = 300)
   
 })
 
 
+# - version 2
 
+ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), 
+                position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
+  labs(title = " ", x = " ", y = " ") +
+  geom_text(aes(label = round(Estimate, 2)), position = position_dodge(width = 1), vjust =-1.5 ,hjust=0.3) + 
+  
+  # Add labels
+  scale_x_discrete(labels = OUTCOMES.labs) +
+  scale_fill_discrete(labels = INDICES.labs) +
+  # Theme
+  guides(fill = guide_legend(title = NULL)) +
+  facet_wrap(~ Ability, nrow = 2) +
+  ylim(-0.08,0.5) +
+  theme_bw()
 
-
-
+ggsave(paste0("plots/comparison_rows.pdf"), width = 11, height = 8, dpi = 300)
 
 
 

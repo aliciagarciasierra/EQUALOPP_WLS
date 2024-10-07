@@ -184,6 +184,32 @@ pgi_noncog<- pgi_noncog %>%
 data <-merge(data, pgi_noncog, by="pgiID", all.y=TRUE)
 
 
+########################## OBSERVED ABILITY cognitive ##########################
+
+# check valids
+valid_summary <- data %>%
+  summarise(
+    total_cognition_grad_4 = sum(!is.na(ri001re)), # 
+    total_cognition_sib_4  = sum(!is.na(si001re)), # 
+    cog_test               = sum(!is.na(z_gwiiq_bm)), # Adolescent cognitive test score
+    centile_rank_cog_test  = sum(!is.na(z_ghncr_bm)), # Centile rank based on national test takers for Henmon-Nelson test score from junior year
+    
+  )
+
+valid_summary 
+# use collected by phone
+
+# Rename
+data <- data %>% rename(IQ = z_gwiiq_bm, centile_rank_IQ = z_ghncr_bm)
+
+# Clean (sending negative values to NA)
+data <- data %>%
+  mutate_at(vars(IQ, centile_rank_IQ),
+            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
+
+# check distributions
+summary(select(data, IQ, centile_rank_IQ))
+
 
 ########################## OBSERVED ABILITY non-cognitive ##########################
 
@@ -219,31 +245,7 @@ data <- data %>%
 summary(select(data, any_of(OBSERVED_NON_COG)))
 
 
-########################## OBSERVED ABILITY cognitive ##########################
 
-# check valids
-valid_summary <- data %>%
-  summarise(
-    total_cognition_grad_4 = sum(!is.na(ri001re)), # 
-    total_cognition_sib_4  = sum(!is.na(si001re)), # 
-    cog_test               = sum(!is.na(z_gwiiq_bm)), # Adolescent cognitive test score
-    centile_rank_cog_test  = sum(!is.na(z_ghncr_bm)), # Centile rank based on national test takers for Henmon-Nelson test score from junior year
-    
-  )
-
-valid_summary 
-# use collected by phone
-
-# Rename
-data <- data %>% rename(IQ = z_gwiiq_bm, centile_rank_IQ = z_ghncr_bm)
-
-# Clean (sending negative values to NA)
-data <- data %>%
-  mutate_at(vars(IQ, centile_rank_IQ),
-            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
-
-# check distributions
-summary(select(data, IQ, centile_rank_IQ))
 
 
 ########################## SELECT FINAL SAMPLE ##########################
@@ -293,6 +295,8 @@ siblings<-siblings[complete.cases(siblings),]
 
 
 saveRDS(siblings, file = "data/siblings.rds")
+
+
 
 
 

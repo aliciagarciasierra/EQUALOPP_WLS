@@ -34,7 +34,9 @@ compute_indexes <- function(outcome_var, siblings) {
   # 3) COMPLETE MODEL
   m2 <- lmer(as.formula(paste(outcome_var, "~ 
     (birth_year + birth_order + sex + mother_age_birth + father_age_birth  +",  
-     paste(OBSERVED_COG, collapse=" + ")," + ", paste(OBSERVED_NON_COG, collapse=" + ") ,")^2 + (1 |familyID)")), data = siblings)
+     paste(OBSERVED_COG, collapse = " + "), " + ", paste(OBSERVED_NON_COG, collapse = " + "), 
+     #" + ", paste(PC_COG,       collapse = " + "), " + ", paste(PC_NON_COG,       collapse = " + "),
+     ")^2 + (1 |familyID)")), data = siblings)
   
   vcov_m2 <- as.data.frame(VarCorr(m2))
   completeind <- vcov_m2[2, 4]
@@ -90,7 +92,7 @@ compute_indexes <- function(outcome_var, siblings) {
 
 print("compute main results")
 # -- convert to lapply
-all_results   <- lapply(OUTCOMES, compute_indexes, siblings=siblings)
+all_results   <- mclapply(OUTCOMES, compute_indexes, siblings=siblings, mc.cores=4)
 final_results <- do.call(rbind.data.frame, all_results)
 
 
@@ -284,7 +286,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   #            legend_position = "right")
 #
 # Save the plot
-ggsave(paste0("plots/results_plot_",OBSERVED_COG,".png"), width = 13, height = 6, dpi = 300)
+ggsave(paste0("plots/results_plot_",OBSERVED_COG,".pdf"), width = 13, height = 6, dpi = 300)
 
 
 

@@ -135,7 +135,7 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
     completeind <- vcov_m2[2, 4]
     completefam <- vcov_m2[1, 4]
     
-    sibcorr <- emptyfam / totalvar
+    sibcorr  <- emptyfam / totalvar
     condcorr <- condfam / totalvar
     w <- (condind - completeind) / totalvar
     v <- (emptyind - completeind) / totalvar
@@ -258,7 +258,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   #            legend_position = "right")
 
 # Save the plot
-ggsave("plots/results_plot.png", width = 13, height = 6, dpi = 300)
+ggsave("plots/results_plot_PGI.pdf", width = 13, height = 6, dpi = 300)
 
 
 

@@ -78,9 +78,11 @@ OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation",
 stopifnot(names(OUTCOMES.labs) == OUTCOMES)
 
 OBSERVED_NON_COG <- c("extraversion", "openness", "neuroticism", "conscientiousness", "agreeableness")
-OBSERVED_COG <- "IQ"
-OBSERVED_COG <- "centile_rank_IQ"
+OBSERVED_COG     <- "centile_rank_IQ"  # or "IQ"
+
 ABILITY_DEFS <- c("polygenic indices", "observed ability")
+PC_COG     <- paste0("pc", 1:10, "cog")
+PC_NON_COG <- paste0("pc", 1:10, "noncog")
 
 
 # settings
