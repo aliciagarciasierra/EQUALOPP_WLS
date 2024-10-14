@@ -119,7 +119,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   ylim(-0.3,0.6) +
   theme_bw()
 
-ggsave(paste0("plots/comparison_rows_log.pdf"), width = 11, height = 8, dpi = 300)
+ggsave(paste0("plots/comparison_rows.pdf"), width = 11, height = 8, dpi = 300)
 
 
 

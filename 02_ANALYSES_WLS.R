@@ -8,9 +8,11 @@ source("00_MASTER_WLS.R")
 
 siblings <- readRDS("data/siblings.rds")
 
-siblings <- siblings %>% 
-  mutate(wealth = ifelse(wealth == 0, 0.000001, wealth)) %>%
-  mutate(wealth = log10(wealth))
+# apply transformations
+
+#siblings <- siblings %>% 
+#  mutate(wealth = ifelse(wealth == 0, 0.000001, wealth)) %>%
+#  mutate(wealth = log10(wealth))
 
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
