@@ -252,19 +252,15 @@ summary(select(data, any_of(OBSERVED_NON_COG)))
 
 # Select all the relevant variables to extract them from the sample
 siblings <- data %>%
-  select(ID, familyID, withinID, # IDs
-         sex, birth_year, mother_age_birth, father_age_birth, birth_order,  # demographics 
-         education, # education
-         occupation, # occupation
-         income_ind, income_hh, #income
-         wealth, #wealth
-         health_self, health_illness, health_pc, #health
-         pgiID, pgi_education, pgi_cognitive, pgi_math_exam, pgi_math_ability, # PGIs cog
-         pgi_depression, pgi_well_being, pgi_neuroticism, # PGIs noncog
-         pc1cog, pc2cog, pc3cog, pc4cog, pc5cog, pc6cog, pc7cog, pc8cog, pc9cog, pc10cog, # principal components cog
-         pc1noncog, pc2noncog, pc3noncog, pc4noncog, pc5noncog, pc6noncog, pc7noncog, pc8noncog, pc9noncog, pc10noncog, # principal components non-cog
-         IQ, centile_rank_IQ, any_of(OBSERVED_NON_COG) # observed abilities
-         )
+  select(ID, familyID, withinID, pgiID, # IDs
+         any_of(ASCRIBED),  # demographics 
+         any_of(OUTCOMES), # outcomes
+         any_of(PGI_COG), # PGIs cog
+         any_of(PGI_NON_COG), # PGIs noncog
+         all_of(PC_COG), # principal components cog
+         all_of(PC_NON_COG), # principal components non-cog
+         any_of(OBSERVED_COG), any_of(OBSERVED_NON_COG) # observed abilities
+  )
 
 # Label NAs rightly
 siblings <- siblings %>%
@@ -273,8 +269,43 @@ siblings <- siblings %>%
 # There are four cases that are not labelled properly and show 3 or 4 siblings, delete them
 siblings<- siblings[!(siblings$withinID %in% c(3, 4)), ]
 
+
+##
+# the following chunks are two alternatives, I think we should do the first one
+##
+
+
+# 1: first remove NAs, then keep only families with 2+ kids
+
+# If we want to select only complete observations it would be...
+siblings <- siblings[complete.cases(siblings),] 
+n_distinct(siblings$ID)
+n_distinct(siblings$familyID)
+
+# filter out families with at least two kids
+siblings <- siblings %>%
+  group_by(familyID) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+n_distinct(siblings$ID) # 1816
+n_distinct(siblings$familyID) # 908
+
+# --- check the number of siblings in each family
+n_siblings <- siblings %>% 
+  group_by(familyID) %>% 
+  summarise(count = n_distinct(ID)) %>%
+  ungroup()
+
+summary(n_siblings$count)
+# only 2
+
+
+
+
+# 2: first keep only families with 2+ kids, then remove NAs 
+
 # Find those families who have siblings
-filter<- siblings%>% 
+filter <- siblings %>% 
   group_by(familyID) %>% 
   summarise(count = n_distinct(ID)) %>%
   filter(count > 1)%>% 
@@ -289,9 +320,24 @@ n_distinct(siblings$ID) # 4140
 n_distinct(siblings$familyID) # 2070
  
 # If we want to select only complete observations it would be...
-siblings<-siblings[complete.cases(siblings),] 
+siblings <- siblings[complete.cases(siblings),] 
+n_distinct(siblings$ID)
+n_distinct(siblings$familyID)
+
+
+# --- check the number of siblings in each family
+n_siblings <- siblings %>% 
+  group_by(familyID) %>% 
+  summarise(count = n_distinct(ID)) %>%
+  ungroup()
+
+summary(n_siblings$count)
+# some 1 and some 2
+
 #3313 cases, nested in 1970 families
-#2729 cases, nested in 1852 families (with observed abilities)
+#2783 cases, nested in 1875 families (with observed abilities)
+
+
 
 
 saveRDS(siblings, file = "data/siblings.rds")

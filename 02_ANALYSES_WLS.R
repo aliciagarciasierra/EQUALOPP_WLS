@@ -8,7 +8,12 @@ source("00_MASTER_WLS.R")
 
 siblings <- readRDS("data/siblings.rds")
 
+siblings <- siblings %>% 
+  mutate(wealth = ifelse(wealth == 0, 0.000001, wealth)) %>%
+  mutate(wealth = log10(wealth))
 
+siblings <- siblings %>%
+  mutate_if(is.numeric, scale)
 
 
 #-------------- Function to compute the main indexes 
@@ -36,9 +41,7 @@ compute_indexes <- function(outcome_var, siblings) {
   m2 <- lmer(as.formula(paste(outcome_var, "~ 
     (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
     pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
-    pgi_depression + pgi_well_being + pgi_neuroticism + 
-    pc1cog+ pc2cog+ pc3cog+ pc4cog+ pc5cog+ pc6cog+ pc7cog+ pc8cog+ pc9cog+ pc10cog +
-    pc1noncog+ pc2noncog+ pc3noncog+ pc4noncog+ pc5noncog+ pc6noncog+ pc7noncog+ pc8noncog+ pc9noncog+ pc10noncog)^2 + 
+    pgi_depression + pgi_well_being + pgi_neuroticism)^2 + 
     (1 |familyID)")), data = siblings)
   
   vcov_m2 <- as.data.frame(VarCorr(m2))
@@ -78,22 +81,8 @@ compute_indexes <- function(outcome_var, siblings) {
 
 #---------------- Store the results from the main analyses
 
-## Initialize an empty list to store all results
-#all_results <- list()
-#
-## Loop over each outcome variable
-#for (outcome in OUTCOMES) {
-#  result <- compute_indexes(outcome, siblings)
-#  
-#  # Append results to the cumulative list
-#  all_results[[outcome]] <- result
-#}
-#
-## Convert the list to a single data frame
-#final_results <- do.call(rbind, all_results)
 
-
-# -- convert to lapply
+print("compute main results")
 all_results   <- mclapply(OUTCOMES, compute_indexes, siblings=siblings, mc.cores = 4)
 final_results <- do.call(rbind.data.frame, all_results)
 
@@ -114,9 +103,7 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
     m2 <- lmer(as.formula(paste(outcome_var, "~ 
       (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
       pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
-      pgi_depression + pgi_well_being + pgi_neuroticism + 
-      pc1cog+ pc2cog+ pc3cog+ pc4cog+ pc5cog+ pc6cog+ pc7cog+ pc8cog+ pc9cog+ pc10cog +
-      pc1noncog+ pc2noncog+ pc3noncog+ pc4noncog+ pc5noncog+ pc6noncog+ pc7noncog+ pc8noncog+ pc9noncog+ pc10noncog)^2 + 
+      pgi_depression + pgi_well_being + pgi_neuroticism )^2 + 
       (1 |familyID)")), data = data_sample)
     
     # Extract variance components
@@ -174,8 +161,9 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
 
 
 
-# -- convert to lapply --
+# ------- compute bootstrapping
 
+print("compute bootstrapping")
 start = Sys.time()
 ci_list <- mclapply(OUTCOMES, function(outcome) {
   outcome_results <- filter(final_results, Outcome==outcome)

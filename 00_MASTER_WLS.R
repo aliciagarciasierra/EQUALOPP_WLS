@@ -21,28 +21,28 @@ rm(list=ls())
 
 # LOAD PACKAGES
 
-library(tidyverse)
-library(haven)
-library(stringr)
-library(tidyr)
-library(labelled)
-library(readxl)
-library(lme4)
-library(fixest)
-library(dplyr)
-library(boot)
-library(Matrix) # note that an updated version of R might be required for this package to work correctly in our analyses
-library(openxlsx)
-library(ggplot2)
-library(pilot)
-library(dplyr)
-library(ggpubr)
-library(missMDA)
-library(parallel)
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(haven)
+  library(stringr)
+  library(tidyr)
+  library(labelled)
+  library(readxl)
+  library(lme4)
+  library(fixest)
+  library(dplyr)
+  library(boot)
+  library(Matrix) # note that an updated version of R might be required for this package to work correctly in our analyses
+  library(openxlsx)
+  library(ggplot2)
+  library(pilot)
+  library(dplyr)
+  library(ggpubr)
+  library(missMDA)
+  library(parallel)
+})
 
 `%!in%` <- function(x, y) !(x %in% y)
-
-
 # SET WD 
 
 #setwd("/Users/spetrini/Library/Mobile Documents/com~apple~CloudDocs/University/UNIL/projects/Inequality-Across-Families-and-PGIs/WLS/EQUALOPP_WLS")
@@ -67,26 +67,34 @@ library(parallel)
 # GLOBALS 
 INDICES <- c("Sibcorr","IOLIB", "IORAD")
 INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "IORAD" = "Radical IOP")
-stopifnot(names(INDICES.labs) == INDICES)
 
-OUTCOMES <- c("education", "occupation","income_ind", 
-                  "income_hh", "wealth", "health_self", "health_illness", "health_pc")
+# outcomes
+OUTCOMES <- c("education", "occupation","income_hh", "wealth", "health_pc")
 OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
   "income_ind" = "Income Ind", "income_hh" = "Income HH", 
   "wealth" = "Wealth", "health_self" = "Health Self-Rep", 
-  "health_illness" = "Health N Illnesses", "health_pc" = "Health PC")
-stopifnot(names(OUTCOMES.labs) == OUTCOMES)
+  "health_illness" = "Health N Illnesses", "health_pc" = "Health")
 
+# ascribed
+ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "father_age_birth", "birth_order")
+
+# ability
+ABILITY_DEFS <- c("polygenic indices", "observed ability")
+
+# - observed
 OBSERVED_NON_COG <- c("extraversion", "openness", "neuroticism", "conscientiousness", "agreeableness")
 OBSERVED_COG     <- "centile_rank_IQ"  # or "IQ"
 
-ABILITY_DEFS <- c("polygenic indices", "observed ability")
+# - pgi
+PGI_COG     <- c("pgi_education", "pgi_cognitive", "pgi_math_exam", "pgi_math_ability")
+PGI_NON_COG <- c("pgi_depression", "pgi_well_being", "pgi_neuroticism")
+PGIs <- c(PGI_COG, PGI_NON_COG)
 PC_COG     <- paste0("pc", 1:10, "cog")
 PC_NON_COG <- paste0("pc", 1:10, "noncog")
 
 
 # settings
-n_boot <- 50
+n_boot <- 100
 
 
 

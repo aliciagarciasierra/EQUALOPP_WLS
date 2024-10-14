@@ -8,9 +8,15 @@ source("00_MASTER_WLS.R")
 
 siblings <- readRDS("data/siblings.rds")
 
+siblings <- siblings %>% 
+  mutate(wealth = ifelse(wealth == 0, 0.000001, wealth)) %>%
+  mutate(wealth = log10(wealth))
+
+siblings <- siblings %>%
+  mutate_if(is.numeric, scale)
 
 
-
+                          
 #-------------- Function to compute the main indexes 
 
 compute_indexes <- function(outcome_var, siblings) {
@@ -32,10 +38,8 @@ compute_indexes <- function(outcome_var, siblings) {
   condfam <- vcov_m1[1, 4]
   
   # 3) COMPLETE MODEL
-  m2 <- lmer(as.formula(paste(outcome_var, "~ 
-    (birth_year + birth_order + sex + mother_age_birth + father_age_birth  +",  
-     paste(OBSERVED_COG, collapse = " + "), " + ", paste(OBSERVED_NON_COG, collapse = " + "), 
-     #" + ", paste(PC_COG,       collapse = " + "), " + ", paste(PC_NON_COG,       collapse = " + "),
+  m2 <- lmer(as.formula(paste(outcome_var,  " ~ (", paste(ASCRIBED, collapse=" + ")," + ",  
+             paste(OBSERVED_COG, collapse = " + "), " + ", paste(OBSERVED_NON_COG, collapse = " + "), 
      ")^2 + (1 |familyID)")), data = siblings)
   
   vcov_m2 <- as.data.frame(VarCorr(m2))
@@ -75,23 +79,7 @@ compute_indexes <- function(outcome_var, siblings) {
 
 #---------------- Store the results from the main analyses
 
-## Initialize an empty list to store all results
-#all_results <- list()
-#
-## Loop over each outcome variable
-#for (outcome in OUTCOMES) {
-#  result <- compute_indexes(outcome, siblings)
-#  
-#  # Append results to the cumulative list
-#  all_results[[outcome]] <- result
-#}
-#
-## Convert the list to a single data frame
-#final_results <- do.call(rbind, all_results)
-
-
 print("compute main results")
-# -- convert to lapply
 all_results   <- mclapply(OUTCOMES, compute_indexes, siblings=siblings, mc.cores=4)
 final_results <- do.call(rbind.data.frame, all_results)
 
@@ -110,8 +98,7 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
     m1 <- lmer(as.formula(paste(outcome_var, "~ (",  
                paste(OBSERVED_COG, collapse=" + ")," + ", paste(OBSERVED_NON_COG, collapse=" + ") ,")^2 + (1 | familyID)")), data = siblings)
     
-    m2 <- lmer(as.formula(paste(outcome_var, "~ 
-    (birth_year + birth_order + sex + mother_age_birth + father_age_birth  +",  
+    m2 <- lmer(as.formula(paste(outcome_var, "~ (", paste(ASCRIBED, collapse=" + ")," + ",  
      paste(OBSERVED_COG, collapse=" + ")," + ", paste(OBSERVED_NON_COG, collapse=" + ") ,")^2 + (1 |familyID)")), data = siblings)
     
     # Extract variance components
@@ -166,44 +153,15 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
   return(cis)
 }
 
-# Create a second data frame for the confidence intervals
-#ci_summary <- data.frame(
-#  Index = character(),
-#  Lower = numeric(),
-#  Upper = numeric(),
-#  Estimate = numeric(),
-#  Outcome = character(),
-#  stringsAsFactors = FALSE
-#)
-#
-## Compute bootstrapping confidence intervals for all outcomes
-#bootstrap_results_list <- list()
-#for (outcome in OUTCOMES) {
-#  outcome_results <- all_results[[outcome]]
-#  bootstrap_results <- compute_indexes_bootstrap(siblings, num_bootstrap_samples = 50, outcome_var = outcome, results = outcome_results)
-#  bootstrap_results_list[[outcome]] <- bootstrap_results
-#  
-#  # Get coefficients from the results
-#  iolib <- (outcome_results$IOLIB[1])  # Assuming IOLIB is in the first row for the outcome
-#  iorad <- (outcome_results$IORAD[3])   # Assuming IORAD is in the third row
-#  sibcorr <- (outcome_results$sibcorr[1])  # Assuming sibcorr is in the first row
-#  
-#  # Populate the ci_summary data frame
-#  ci_summary <- rbind(ci_summary, 
-#                      data.frame(Index = "IOLIB", Lower = bootstrap_results["Liberal", "Lower"], Upper = bootstrap_results["Liberal", "Upper"], Estimate = iolib, Outcome = outcome),
-#                      data.frame(Index = "IORAD", Lower = bootstrap_results["Radical", "Lower"], Upper = bootstrap_results["Radical", "Upper"], Estimate = iorad, Outcome = outcome),
-#                      data.frame(Index = "Sibcorr", Lower = bootstrap_results["Sibling correlation", "Lower"], Upper = bootstrap_results["Sibling correlation", "Upper"], Estimate = sibcorr, Outcome = outcome))
-#}
 
 
-
-# -- convert to lapply --
+# --------- Compute bootstrapping
 
 print("compute bootstrapping")
 
 start = Sys.time()
 ci_list <- mclapply(OUTCOMES, function(outcome) {
-  outcome_results <- filter(final_results, Outcome==outcome)
+  outcome_results   <- filter(final_results, Outcome==outcome)
   bootstrap_results <- compute_indexes_bootstrap(siblings, num_bootstrap_samples = n_boot, outcome_var = outcome, results = outcome_results)
   
   # Get coefficients from the results
@@ -212,9 +170,11 @@ ci_list <- mclapply(OUTCOMES, function(outcome) {
   sibcorr <- (outcome_results$sibcorr[1])  # Assuming sibcorr is in the first row
   
   # Populate the ci_summary data frame
-  rbind(data.frame(Index = "IOLIB", Lower = bootstrap_results["Liberal", "Lower"], Upper = bootstrap_results["Liberal", "Upper"], Estimate = iolib, Outcome = outcome),
-        data.frame(Index = "IORAD", Lower = bootstrap_results["Radical", "Lower"], Upper = bootstrap_results["Radical", "Upper"], Estimate = iorad, Outcome = outcome),
-        data.frame(Index = "Sibcorr", Lower = bootstrap_results["Sibling correlation", "Lower"], Upper = bootstrap_results["Sibling correlation", "Upper"], Estimate = sibcorr, Outcome = outcome))
+  data.frame("Index"    = c("IOLIB", "IORAD", "Sibcorr"),
+             "Lower"    = c(bootstrap_results["Liberal", "Lower"], bootstrap_results["Radical", "Lower"], bootstrap_results["Sibling correlation", "Lower"]),
+             "Upper"    = c(bootstrap_results["Liberal", "Upper"], bootstrap_results["Radical", "Upper"], bootstrap_results["Sibling correlation", "Upper"]),
+             "Estimate" = c(iolib, iorad, sibcorr), 
+             "Outcome"  = outcome)
 }, mc.cores = 4)
 
 stop = Sys.time()
@@ -228,7 +188,7 @@ final_results <- final_results[ , !names(final_results) %in% c("CI_Upper_IOLIB",
                                                                "CI_Upper_IORAD", "CI_Lower_IORAD",
                                                                "CI_Upper_Sibcorr", "CI_Lower_Sibcorr")]
 
-
+plot(density(siblings$wealth))
 
 
 #----------------Store bootstrapping results
