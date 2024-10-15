@@ -4,6 +4,9 @@
 ###################### DATA CLEANING AND RESHAPING #################
 #####################################################################
 
+source("00_MASTER_WLS.R")
+
+
 # FAST READ FROM RDS
 
 data       <- readRDS("data/data.rds")
@@ -34,7 +37,7 @@ data$pgiID<-paste(data$idpub,data$rtype, sep = "_")
 data <- data %>%
   mutate(
     # race = z_ie020re, # 1 white, 2 other (we don't need it, but leave it here just in case)
-    sex = z_sexrsp, # 1 male, 2 female
+    sex = z_sexrsp, # 1 male (0), 2 female (1)
     birth_year =  z_brdxdy # note that birth month is protected characteristic in WLS, but we don't need it
   )
 
@@ -42,9 +45,10 @@ data <- data %>%
 #--- Parental ages at the time of birth
 data <- data %>%
   mutate(
-    birth_year_mother = ifelse(z_ge051ma < 0, NA, z_ge051ma), 
-    birth_year_father = ifelse(z_he063fa < 0, NA, z_he063fa),
-    birth_year = ifelse(birth_year < 0, NA, birth_year)) %>% 
+    birth_year_mother = ifelse(z_ge051ma  < 0, NA, z_ge051ma), 
+    birth_year_father = ifelse(z_he063fa  < 0, NA, z_he063fa),
+    birth_year        = ifelse(birth_year < 0, NA, birth_year),
+    sex               = case_when(sex == 1 ~ 0, sex == 2 ~ 1, TRUE ~ NA_real_ )) %>% 
   mutate(
     mother_age_birth = birth_year- birth_year_mother,
     father_age_birth = birth_year- birth_year_father)
@@ -70,45 +74,49 @@ missing_summary <- data %>%
     valid_yoe_4 = sum(!is.na(z_mx001rer)) #R06 Summary of equivalent years of regular education based on highest degree.
   )
 
+
+EDU         <- c(education_1       = "z_edeqyr",   education_2       = "z_rb004red", education_3      = "z_gb103red", education_4   = "z_hb103red") # years of education 
+OCCU        <- c(occu_3            = "z_ocsx1u2" , occu_4            = "z_rcu22sp") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
+INC_IND     <- c(income_ind_5      = "z_gp250rec", income_ind_6      = "z_hpu50rec") # individual level income (total personal income)
+INC_HH      <- c(income_hh_5       = "z_gp260hec", income_hh_6       = "z_hpu60hec") # household level income (total household income)
+WEALTH      <- c(wealth_4          = "z_rr043rec", wealth_5          = "z_gr100rpc", wealth_6         = "z_hr100rpc")  # wealth (net worth at the family level)
+HEALTH_S    <- c(health_self_4     = "z_mx001rer", health_self_5     = "z_ix001rer", health_self_6    = "z_jx001rer", health_self_7 = "z_q1x001rer") # self-reported health (from 1 very poor to 5 excellent)
+HEALTH_ILL  <- c(health_illness_4  = "z_mx117rec", health_illness_5  = "z_ix117rec", health_illness_6 = "z_jx117rec") # total number of illnesses
+HEALTH_HOSP <- c(health_hospital_4 = "z_mx008rer", health_hospital_5 = "z_ixhi08re") # number of times in the hospital in previous year (overnight stay)
+
+
+
 # Rename
-data <- data %>%
-  mutate(
-    education_1 = z_edeqyr, education_2= z_rb004red, education_3= z_gb103red, education_4= z_hb103red  ,# years of education (variables with the highest number of valid cases across cohorts)
-    occu_3 = z_ocsx1u2 , occu_4 = z_rcu22sp, # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
-    income_ind_5 = z_gp250rec, income_ind_6 = z_hpu50rec,  # individual level income (total personal income)
-    income_hh_5 = z_gp260hec, income_hh_6 = z_hpu60hec, # household level income (total household income)
-    wealth_4 = z_rr043rec, wealth_5 = z_gr100rpc, # wealth (net worth at the family level)
-    health_self_4 = z_mx001rer, health_self_5 = z_ix001rer,    health_self_6    = z_jx001rer, health_self_7 = z_q1x001rer, # self-reported health (from 1 very poor to 5 excellent)
-    health_illness_4  = z_mx117rec, health_illness_5 = z_ix117rec, health_illness_6 = z_jx117rec, # total number of illnesses 
-    health_hospital_4 = z_mx008rer, health_hospital_5 = z_ixhi08re # number of times in the hospital in previous year (overnight stay)
-  )
+data <- data %>% rename(!!!EDU, !!!OCCU, !!!INC_IND, !!!INC_HH, !!!WEALTH, !!!HEALTH_S, !!!HEALTH_ILL, !!!HEALTH_HOSP)
+
 
 # Clean (sending negative values to NA)
+
+# -- wealth (only negative with label)
 data <- data %>%
-  mutate_at(vars(education_1, education_2, education_3, education_4, 
-                 occu_3, 
-                 income_ind_5, income_ind_6, income_hh_5, income_hh_6, 
-                 wealth_4, wealth_5, 
-                 health_self_4, health_self_5, health_self_6, health_self_7,
-                 health_illness_4, health_illness_5, health_illness_6,
-                 health_hospital_4, health_hospital_5),
-            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
+  mutate_at(vars(names(WEALTH)), ~ ifelse(. %in% -31:-1, NA, .))
+
+# -- other (all negative)
+data <- data %>%
+  mutate_at(vars(names(EDU), names(OCCU), names(INC_IND), names(INC_HH), names(HEALTH_S), names(HEALTH_ILL), names(HEALTH_HOSP)),
+            ~ ifelse(. < 0, NA, .))
+
 
 # Combine averaging to have more stable measures
 data <- data %>%
   mutate(
-    education=rowMeans(cbind(education_1, education_2, education_3, education_4), na.rm=TRUE),
-    occupation = rowMeans(cbind(occu_3, occu_4), na.rm=TRUE),
-    income_ind = rowMeans(cbind(income_ind_5, income_ind_6), na.rm=TRUE),
-    income_hh = rowMeans(cbind(income_hh_5, income_hh_6), na.rm=TRUE),
-    wealth = rowMeans(cbind(wealth_4, wealth_5), na.rm=TRUE),
-    health_self = rowMeans(cbind(health_self_4, health_self_5, health_self_6, health_self_7), na.rm=TRUE),
-    health_illness = rowMeans(cbind(health_illness_4, health_illness_5, health_illness_6), na.rm=TRUE),
-    health_hospital = rowMeans(cbind(health_hospital_4, health_hospital_5), na.rm=TRUE)
+    education       = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
+    occupation      = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
+    income_ind      = rowMeans(select(., all_of(names(INC_IND))),     na.rm=TRUE),
+    income_hh       = rowMeans(select(., all_of(names(INC_HH))),      na.rm=TRUE),
+    wealth          = rowMeans(select(., all_of(names(WEALTH))),      na.rm=TRUE),
+    health_self     = rowMeans(select(., all_of(names(HEALTH_S))),    na.rm=TRUE),
+    health_illness  = rowMeans(select(., all_of(names(HEALTH_ILL))),  na.rm=TRUE),
+    health_hospital = rowMeans(select(., all_of(names(HEALTH_HOSP))), na.rm=TRUE)
     )
 
-# Principal components for the combined health variable
 
+# Principal components for the combined health variable
 pcdata <- data %>% # extract variables 
   select(ID, health_self_4, health_illness_4, health_hospital_4)
 
@@ -116,14 +124,54 @@ nb_comp <- estim_ncpPCA(pcdata %>% select(-ID))
 pca_result <- imputePCA(pcdata %>% select(-ID), ncp = nb_comp$ncp)  # PCA with missing data imputation
 
 pcdata <- pcdata %>%
-  mutate(health_pc = pca_result$completeObs[, 1]) %>% # extract the first principal component (PC1) and center it
-  mutate(health_pc = health_pc - mean(health_pc))
+  mutate(
+    health_pc = pca_result$completeObs[, 1]) # %>% # extract the first principal component (PC1) and center it
+  #mutate(health_pc = health_pc - mean(health_pc)))
 
 pcdata <- pcdata %>%
   select(ID, health_pc)
 
 # Merge with the original data
 data <- merge(data, pcdata, by = "ID", all.x = TRUE)
+
+
+
+# Building wealth from scratch
+
+ASSETS_VARS <- c("home_equity" = "z_rr023rec", "other_estate_equity" = "z_rr027rec", "business_equity" = "z_rr031rec", 
+                 "savings"     = "z_rr040re",  "investments"         = "z_rr041re")
+DEBTS_VARS <- c("other_debts" = "z_rr037re")
+
+# rename
+data <- data %>% rename(!!!ASSETS_VARS) %>% rename(!!!DEBTS_VARS)
+
+# recode NAs
+data <- data %>% mutate(across(any_of(c(names(ASSETS_VARS), names(DEBTS_VARS))), ~ ifelse(. %in% c(-3, -2, -1), NA, .)))
+
+# construct wealth variable
+data <- data %>% mutate(
+  assets = ifelse(
+    rowSums(is.na(select(., all_of(names(ASSETS_VARS))))) == length(ASSETS_VARS), NA, # if all NA, NA
+    rowSums(across(names(ASSETS_VARS)), na.rm = TRUE)                                 # otherwise, sum all available values
+    ),
+  debts = ifelse(
+    rowSums(is.na(select(., all_of(names(DEBTS_VARS))))) == length(DEBTS_VARS), NA, # if all NA, NA
+    rowSums(across(names(DEBTS_VARS)), na.rm = TRUE)                                 # otherwise, sum all available values
+  )
+) %>% mutate(
+  wealth_built = ifelse(
+    rowSums(is.na(cbind(assets, debts))) == 2, NA, # if all NA, NA
+    replace_na(assets, 0) - replace_na(debts, 0)
+  )
+)
+
+# check distribution
+plot(density(na.omit(data$wealth_built)))
+
+
+# compare to net worth
+plot(na.omit(select(data,wealth, wealth_built)))
+
 
 ########################## PGIs cognitive ######################################
 
@@ -252,13 +300,13 @@ summary(select(data, any_of(OBSERVED_NON_COG)))
 
 # Select all the relevant variables to extract them from the sample
 siblings <- data %>%
-  select(ID, familyID, withinID, pgiID, # IDs
-         any_of(ASCRIBED),  # demographics 
-         any_of(OUTCOMES), # outcomes
-         any_of(PGI_COG), # PGIs cog
-         any_of(PGI_NON_COG), # PGIs noncog
-         all_of(PC_COG), # principal components cog
-         all_of(PC_NON_COG), # principal components non-cog
+  select(ID, familyID, withinID, pgiID,                 # IDs
+         any_of(ASCRIBED),                              # demographics 
+         any_of(OUTCOMES),                              # outcomes
+         any_of(PGI_COG),                               # PGIs cog
+         any_of(PGI_NON_COG),                           # PGIs noncog
+         all_of(PC_COG),                                # principal components cog
+         all_of(PC_NON_COG),                            # principal components non-cog
          any_of(OBSERVED_COG), any_of(OBSERVED_NON_COG) # observed abilities
   )
 
@@ -270,27 +318,25 @@ siblings <- siblings %>%
 siblings<- siblings[!(siblings$withinID %in% c(3, 4)), ]
 
 
-##
-# the following chunks are two alternatives, I think we should do the first one
-##
-
-
-# 1: first remove NAs, then keep only families with 2+ kids
-
 # If we want to select only complete observations it would be...
 siblings <- siblings[complete.cases(siblings),] 
-n_distinct(siblings$ID)
-n_distinct(siblings$familyID)
+n_distinct(siblings$ID)       # 5465
+n_distinct(siblings$familyID) # 4676
 
-# filter out families with at least two kids
+# keep only families with at least two kids
 siblings <- siblings %>%
   group_by(familyID) %>%
   filter(n() >= 2) %>%
   ungroup()
-n_distinct(siblings$ID) # 1816
-n_distinct(siblings$familyID) # 908
+n_distinct(siblings$ID) # 1578
+n_distinct(siblings$familyID) # 789
 
-# --- check the number of siblings in each family
+
+# center health PC
+siblings <- siblings %>% mutate(health_pc = health_pc - mean(health_pc))
+
+
+# Check the number of siblings in each family
 n_siblings <- siblings %>% 
   group_by(familyID) %>% 
   summarise(count = n_distinct(ID)) %>%
@@ -300,47 +346,14 @@ summary(n_siblings$count)
 # only 2
 
 
-
-
-# 2: first keep only families with 2+ kids, then remove NAs 
-
-# Find those families who have siblings
-filter <- siblings %>% 
-  group_by(familyID) %>% 
-  summarise(count = n_distinct(ID)) %>%
-  filter(count > 1)%>% 
-  ungroup()
-
-# Filter only those with siblings from the original sample
-siblings <- siblings%>% 
-  filter(familyID %in% unique(filter$familyID))
-
-# Count unique observations
-n_distinct(siblings$ID) # 4140
-n_distinct(siblings$familyID) # 2070
- 
-# If we want to select only complete observations it would be...
-siblings <- siblings[complete.cases(siblings),] 
-n_distinct(siblings$ID)
-n_distinct(siblings$familyID)
-
-
-# --- check the number of siblings in each family
-n_siblings <- siblings %>% 
-  group_by(familyID) %>% 
-  summarise(count = n_distinct(ID)) %>%
-  ungroup()
-
-summary(n_siblings$count)
-# some 1 and some 2
-
-#3313 cases, nested in 1970 families
-#2783 cases, nested in 1875 families (with observed abilities)
+#1578 cases, nested in 789 families (with observed abilities)
 
 
 
 
 saveRDS(siblings, file = "data/siblings.rds")
+
+
 
 
 

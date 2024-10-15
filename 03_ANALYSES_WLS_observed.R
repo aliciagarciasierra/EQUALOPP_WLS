@@ -190,7 +190,6 @@ final_results <- final_results[ , !names(final_results) %in% c("CI_Upper_IOLIB",
                                                                "CI_Upper_IORAD", "CI_Lower_IORAD",
                                                                "CI_Upper_Sibcorr", "CI_Lower_Sibcorr")]
 
-plot(density(siblings$wealth))
 
 
 #----------------Store bootstrapping results

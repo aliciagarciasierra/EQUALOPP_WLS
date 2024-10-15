@@ -102,6 +102,11 @@ data_graph <- data_graph %>% mutate(
   Ability = factor(Ability, levels = ABILITY_DEFS)
 )
 
+n <- nrow(siblings)
+
+# labels with sample size
+custom_labels <- c("polygenic indices" = paste0("polygenic indices (n=", n, ")"), "observed ability" = paste0("observed ability (n=", n, ")"))
+
 
 ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   geom_bar(stat = "identity", position = "dodge") +
@@ -115,8 +120,8 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   scale_fill_discrete(labels = INDICES.labs) +
   # Theme
   guides(fill = guide_legend(title = NULL)) +
-  facet_wrap(~ Ability, nrow = 2) +
-  ylim(-0.3,0.6) +
+  facet_wrap(~ Ability, nrow = 2, labeller = labeller(Ability = custom_labels)) +
+  ylim(-0.1,0.5) +
   theme_bw()
 
 ggsave(paste0("plots/comparison_rows.pdf"), width = 11, height = 8, dpi = 300)
@@ -126,19 +131,25 @@ ggsave(paste0("plots/comparison_rows.pdf"), width = 11, height = 8, dpi = 300)
 
 
 ####################################################################
-#################### VARIABLES DISTRIBUTION ########################
+###################### SIBLING SIMILARITY ##########################
 ####################################################################
 
-# wealth
+# Reshape to wide at the family level
+wide<-reshape(as.data.frame(siblings),direction="wide", idvar="familyID", timevar="withinID")
 
-siblings <- readRDS("data/siblings.rds")
+# compute mean differences
+mean_diff <- lapply(OUTCOMES, function(var) {
+  x_var <- paste0(var, ".1")
+  y_var <- paste0(var, ".2")
+  
+  all_diff <- wide %>% reframe(diff = abs(get(x_var, wide) - get(y_var, wide))) %>% unlist()
+  m <- mean(all_diff) %>% round(2) # 1.851
+  list("outcome" = var, "mean_sib_diff" = m)
+})
 
-ggplot(siblings) + geom_density(aes(wealth)) + scale_x_log10()
-
-
-
-
-
+# save
+diff_tab <- do.call(rbind.data.frame, mean_diff) %>% cbind("unit" = c("years", "Duncan SEI score", "Dollars", "Dollars", "PC"))
+write_csv(diff_tab, "results/siblings_differences.csv")
 
 
 
