@@ -3,6 +3,8 @@
 ###################### DESCRIPTIVES  ###########################################
 ###################################################################################
 
+source("00_MASTER_WLS.R")
+
 ####################################################################
 ################## FIGURE 1: HEXBIN CHART ##############################
 ####################################################################
@@ -125,6 +127,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   theme_bw()
 
 ggsave(paste0("plots/comparison_rows.pdf"), width = 11, height = 8, dpi = 300)
+   
 
 
 
@@ -137,7 +140,7 @@ ggsave(paste0("plots/comparison_rows.pdf"), width = 11, height = 8, dpi = 300)
 # Reshape to wide at the family level
 wide<-reshape(as.data.frame(siblings),direction="wide", idvar="familyID", timevar="withinID")
 
-# compute mean differences
+# compute mean outcome differences
 mean_diff <- lapply(OUTCOMES, function(var) {
   x_var <- paste0(var, ".1")
   y_var <- paste0(var, ".2")
@@ -149,10 +152,26 @@ mean_diff <- lapply(OUTCOMES, function(var) {
 
 # save
 diff_tab <- do.call(rbind.data.frame, mean_diff) %>% cbind("unit" = c("years", "Duncan SEI score", "Dollars", "Dollars", "PC"))
-write_csv(diff_tab, "results/siblings_differences.csv")
+write_csv(diff_tab, "results/siblings_diff_outcomes.csv")
 
 
 
+# compute mean differences
+
+mean_diff <- lapply(PGIs, function(var) {
+  
+  x_var <- paste0(var, ".1")
+  y_var <- paste0(var, ".2")
+  
+  all_diff <- wide %>% 
+    reframe(diff = abs(get(x_var, wide) - get(y_var, wide))) %>% unlist()
+  m <- mean(all_diff) %>% round(2) # 1.851
+  list("PGI" = var, "mean_sib_diff" = m)
+})
+
+# save
+diff_tab <- do.call(rbind.data.frame, mean_diff) 
+write_csv(diff_tab, "results/siblings_diff_PGIs.csv")
 
 
 
