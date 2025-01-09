@@ -75,8 +75,13 @@ missing_summary <- data %>%
   )
 
 
-EDU         <- c(education_1       = "z_edeqyr",   education_2       = "z_rb004red", education_3      = "z_gb103red", education_4   = "z_hb103red") # years of education 
-OCCU        <- c(occu_3            = "z_ocsx1u2" , occu_4            = "z_rcu22sp") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
+EDU         <- c(education_1       = "z_edeqyr",   education_2       = "z_rb004red", education_3      = "z_gb103red", education_4   = "z_hb103red") # years of education
+OCCU        <- c(occu_3            = "z_ocsx1u2" , occu_4            = "z_rcu22sp") 
+OCCU        <- c(occu_3            = "z_ocsxcru2", occu_4           = "sfu57ref") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
+# notes on OCCU:
+# previous version: z_ocsx1u2 is Duncan of first job (wave 3), z_rcu22sp is Duncan for current spouse's current/last job
+# current version: z_ocsxcru2 is Duncan of current or last job (wave 3), z_rcu22sp is Duncan of current or last job (wave 4)
+
 INC_IND     <- c(income_ind_5      = "z_gp250rec", income_ind_6      = "z_hpu50rec") # individual level income (total personal income)
 INC_HH      <- c(income_hh_5       = "z_gp260hec", income_hh_6       = "z_hpu60hec") # household level income (total household income)
 WEALTH      <- c(wealth_4          = "z_rr043rec", wealth_5          = "z_gr100rpc", wealth_6         = "z_hr100rpc")  # wealth (net worth at the family level)
@@ -214,17 +219,7 @@ pgi_noncog<- pgi_noncog %>%
     pgiID,
     pgi_depression = pgs_dep_gwas,
     pgi_neuroticism = pgs_neur_gwas,
-    pgi_well_being = pgs_swb_gwas,
-    pc1noncog = pc1_shuffled,
-    pc2noncog = pc2_shuffled,
-    pc3noncog = pc3_shuffled,
-    pc4noncog = pc4_shuffled,
-    pc5noncog = pc5_shuffled,
-    pc6noncog = pc6_shuffled,
-    pc7noncog = pc7_shuffled,
-    pc8noncog = pc8_shuffled,
-    pc9noncog = pc9_shuffled,
-    pc10noncog = pc10_shuffled
+    pgi_well_being = pgs_swb_gwas
   )
 
 # Merge with main data
@@ -306,7 +301,6 @@ siblings <- data %>%
          any_of(PGI_COG),                               # PGIs cog
          any_of(PGI_NON_COG),                           # PGIs noncog
          all_of(PC_COG),                                # principal components cog
-         all_of(PC_NON_COG),                            # principal components non-cog
          any_of(OBSERVED_COG), any_of(OBSERVED_NON_COG) # observed abilities
   )
 

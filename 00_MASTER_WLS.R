@@ -90,7 +90,7 @@ PGI_COG     <- c("pgi_education", "pgi_cognitive", "pgi_math_exam", "pgi_math_ab
 PGI_NON_COG <- c("pgi_depression", "pgi_well_being", "pgi_neuroticism")
 PGIs <- c(PGI_COG, PGI_NON_COG)
 PC_COG     <- paste0("pc", 1:10, "cog")
-PC_NON_COG <- paste0("pc", 1:10, "noncog")
+#PC_NON_COG <- paste0("pc", 1:10, "noncog")
 
 
 # settings
