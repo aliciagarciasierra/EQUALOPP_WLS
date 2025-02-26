@@ -282,9 +282,12 @@ siblings <- siblings %>%
   group_by(familyID) %>%
   filter(n() >= 2) %>%
   ungroup()
-n_distinct(siblings$ID) # 1576
+n_distinct(siblings$ID) # 1573
 n_distinct(siblings$familyID) # 788
 
+
+#remove those with unrealistic parental ages
+siblings<- siblings[siblings$mother_age_birth >= 14 & siblings$father_age_birth >= 14, ]
 
 # center health PC
 siblings <- siblings %>% mutate(health_pc = health_pc - mean(health_pc))

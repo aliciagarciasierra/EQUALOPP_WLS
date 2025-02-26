@@ -300,8 +300,9 @@ for (outcome in outcomes) {
       panel.grid.minor = element_blank(),  # Remove minor grid lines
       plot.margin = margin(10, 10, 10, 10),  # Add space around the plot
       legend.position = "none",  # Remove the legend
-      plot.title = element_text(hjust = 0.5)
-    )
+      plot.title = element_text(hjust = 0.5)) +
+    scale_y_continuous(limits = c(0, 0.5)) 
+
   
   # Store the plot in the list with the outcome name as the key
   plots_list_pgi[[outcome]] <- p
