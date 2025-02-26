@@ -9,9 +9,9 @@ source("00_MASTER_WLS.R")
 
 # FAST READ FROM RDS
 
-data       <- readRDS("data.rds")
-pgi_cog    <- readRDS("pgi_cog.rds")
-pgi_noncog <- readRDS("pgi_noncog.rds")
+data       <- readRDS("data/data.rds")
+pgi_cog    <- readRDS("data/pgi_cog.rds")
+pgi_noncog <- readRDS("data/pgi_noncog.rds")
 
 
 ############################ IDENTIFIERS ########################
@@ -76,14 +76,9 @@ missing_summary <- data %>%
 
 
 EDU         <- c(education_1       = "z_edeqyr",   education_2       = "z_rb004red", education_3      = "z_gb103red", education_4   = "z_hb103red") # years of education
-OCCU        <- c(occu_3            = "z_ocsx1u2" , occu_4            = "z_rcu22sp") 
 OCCU        <- c(occu_3            = "z_ocsxcru2", occu_4           = "sfu57ref") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
-# notes on OCCU:
-# previous version: z_ocsx1u2 is Duncan of first job (wave 3), z_rcu22sp is Duncan for current spouse's current/last job
-# current version: z_ocsxcru2 is Duncan of current or last job (wave 3), z_rcu22sp is Duncan of current or last job (wave 4)
-
 INC_IND     <- c(income_ind_5      = "z_gp250rec", income_ind_6      = "z_hpu50rec") # individual level income (total personal income)
-INC     <- c(income_5       = "z_gp260hec", income_6       = "z_hpu60hec") # household level income (total household income)
+INC         <- c(income_5       = "z_gp260hec", income_6       = "z_hpu60hec") # household level income (total household income)
 WEALTH      <- c(wealth_4          = "z_rr043rec", wealth_5          = "z_gr100rpc", wealth_6         = "z_hr100rpc")  # wealth (net worth at the family level)
 HEALTH_S    <- c(health_self_4     = "z_mx001rer", health_self_5     = "z_ix001rer", health_self_6    = "z_jx001rer", health_self_7 = "z_q1x001rer") # self-reported health (from 1 very poor to 5 excellent)
 HEALTH_ILL  <- c(health_illness_4  = "z_mx117rec", health_illness_5  = "z_ix117rec", health_illness_6 = "z_jx117rec") # total number of illnesses
@@ -113,7 +108,7 @@ data <- data %>%
     education       = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
     occupation      = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
     income_ind      = rowMeans(select(., all_of(names(INC_IND))),     na.rm=TRUE),
-    income       = rowMeans(select(., all_of(names(INC))),      na.rm=TRUE),
+    income          = rowMeans(select(., all_of(names(INC))),         na.rm=TRUE),
     wealth          = rowMeans(select(., all_of(names(WEALTH))),      na.rm=TRUE),
     health_self     = rowMeans(select(., all_of(names(HEALTH_S))),    na.rm=TRUE),
     health_illness  = rowMeans(select(., all_of(names(HEALTH_ILL))),  na.rm=TRUE),
@@ -141,41 +136,6 @@ data <- merge(data, pcdata, by = "ID", all.x = TRUE)
 
 
 
-# Building wealth from scratch
-
-ASSETS_VARS <- c("home_equity" = "z_rr023rec", "other_estate_equity" = "z_rr027rec", "business_equity" = "z_rr031rec", 
-                 "savings"     = "z_rr040re",  "investments"         = "z_rr041re")
-DEBTS_VARS <- c("other_debts" = "z_rr037re")
-
-# rename
-data <- data %>% rename(!!!ASSETS_VARS) %>% rename(!!!DEBTS_VARS)
-
-# recode NAs
-data <- data %>% mutate(across(any_of(c(names(ASSETS_VARS), names(DEBTS_VARS))), ~ ifelse(. %in% c(-3, -2, -1), NA, .)))
-
-# construct wealth variable
-data <- data %>% mutate(
-  assets = ifelse(
-    rowSums(is.na(select(., all_of(names(ASSETS_VARS))))) == length(ASSETS_VARS), NA, # if all NA, NA
-    rowSums(across(names(ASSETS_VARS)), na.rm = TRUE)                                 # otherwise, sum all available values
-    ),
-  debts = ifelse(
-    rowSums(is.na(select(., all_of(names(DEBTS_VARS))))) == length(DEBTS_VARS), NA, # if all NA, NA
-    rowSums(across(names(DEBTS_VARS)), na.rm = TRUE)                                 # otherwise, sum all available values
-  )
-) %>% mutate(
-  wealth_built = ifelse(
-    rowSums(is.na(cbind(assets, debts))) == 2, NA, # if all NA, NA
-    replace_na(assets, 0) - replace_na(debts, 0)
-  )
-)
-
-# check distribution
-plot(density(na.omit(data$wealth_built)))
-
-
-# compare to net worth
-plot(na.omit(select(data,wealth, wealth_built)))
 
 
 ########################## PGIs cognitive ######################################
@@ -339,7 +299,17 @@ n_siblings <- siblings %>%
 summary(n_siblings$count)
 # only 2
 
-saveRDS(siblings, file = "siblings.rds")
+saveRDS(siblings, file = "data/siblings.rds")
+
+
+
+# Check age at ability measurement
+1977-min(siblings$birth_year)
+1977-max(siblings$birth_year)
+
+
+
+
 
 
 
