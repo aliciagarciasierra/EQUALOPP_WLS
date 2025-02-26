@@ -41,12 +41,13 @@ suppressPackageStartupMessages({
   library(ggpubr)
   library(missMDA)
   library(parallel)
+  library(car)
 })
 
 `%!in%` <- function(x, y) !(x %in% y)
 # SET WD 
 
-setwd("/Users/agarcias/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/data")
+#setwd("/Users/agarcias/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/data")
 
 
 # OPEN RAW DATA (first time)

@@ -6,10 +6,25 @@
 set.seed(123)
 source("00_MASTER_WLS.R")
 
-siblings <- readRDS("siblings.rds")
+siblings <- readRDS("data/siblings.rds")
 
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
+
+
+#-------------- models specifications
+ascr_vars    <- paste(ASCRIBED,     collapse=" + ")
+pgi_vars     <- paste(PGIs, collapse=" + ")
+
+m0_vars <- "1"
+m1_vars <- paste0("(", pgi_vars, ")^2")
+m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
+famID   <- "+ (1 | familyID)"
+
+
+
+
+
 
 
 #-------------- Function to compute the main indexes 
@@ -17,7 +32,7 @@ siblings <- siblings %>%
 compute_indexes <- function(outcome_var, siblings) {
   
   # 1) NULL MODEL
-  m0 <- lmer(as.formula(paste(outcome_var, "~ 1 + (1 | familyID)")), data = siblings)
+  m0 <- lmer(as.formula(paste(outcome_var, "~", m0_vars, famID)), data = siblings)
   
   vcov_m0 <- as.data.frame(VarCorr(m0))
   emptyind <- vcov_m0[2, 4]
@@ -25,20 +40,14 @@ compute_indexes <- function(outcome_var, siblings) {
   totalvar <- (vcov_m0[1, 4] + vcov_m0[2, 4])
   
   # 2) CONDITIONAL MODEL
-  m1 <- lmer(as.formula(paste(outcome_var, "~ 
-    (pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +  
-     pgi_depression + pgi_well_being + pgi_neuroticism)^2 + (1 | familyID)")), data = siblings)
+  m1 <- lmer(as.formula(paste(outcome_var, "~", m1_vars, famID)), data = siblings)
   
   vcov_m1 <- as.data.frame(VarCorr(m1))
   condind <- vcov_m1[2, 4]
   condfam <- vcov_m1[1, 4]
   
   # 3) COMPLETE MODEL
-  m2 <- lmer(as.formula(paste(outcome_var, "~ 
-    (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
-    pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
-    pgi_depression + pgi_well_being + pgi_neuroticism)^2 + 
-    (1 |familyID)")), data = siblings)
+  m2 <- lmer(as.formula(paste(outcome_var, "~", m2_vars, famID)), data = siblings)
   
   vcov_m2 <- as.data.frame(VarCorr(m2))
   completeind <- vcov_m2[2, 4]
@@ -92,15 +101,9 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
     data_sample <- bootstrap_data[indices, ]
     
     # Compute the models and the statistics (similar to compute_indexes function)
-    m0 <- lmer(as.formula(paste(outcome_var, "~ 1 + (1 | familyID)")), data = data_sample)
-    m1 <- lmer(as.formula(paste(outcome_var, "~ 
-      (pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +  
-      pgi_depression + pgi_well_being + pgi_neuroticism)^2 + (1 | familyID)")), data = data_sample)
-    m2 <- lmer(as.formula(paste(outcome_var, "~ 
-      (birth_year + birth_order + sex + mother_age_birth + father_age_birth +
-      pgi_education + pgi_cognitive + pgi_math_exam + pgi_math_ability +
-      pgi_depression + pgi_well_being + pgi_neuroticism )^2 + 
-      (1 |familyID)")), data = data_sample)
+    m0 <- lmer(as.formula(paste(outcome_var, "~", m0_vars, famID)), data = data_sample)
+    m1 <- lmer(as.formula(paste(outcome_var, "~", m1_vars, famID)), data = data_sample)
+    m2 <- lmer(as.formula(paste(outcome_var, "~", m2_vars, famID)), data = data_sample)
     
     # Extract variance components
     vcov_m0 <- as.data.frame(VarCorr(m0))
@@ -134,16 +137,16 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
   bootstrap_results <- boot(siblings, fit_model_and_compute_indexes, R = num_bootstrap_samples)
   
   # Calculate standard errors for the bootstrapped estimates
-  se_iolib <- sd(bootstrap_results$t[, 1])  # Index 1 for IOLIB
-  se_iorad <- sd(bootstrap_results$t[, 2])  # Index 2 for IORAD
+  se_iolib   <- sd(bootstrap_results$t[, 1])  # Index 1 for IOLIB
+  se_iorad   <- sd(bootstrap_results$t[, 2])  # Index 2 for IORAD
   se_sibcorr <- sd(bootstrap_results$t[, 3])  # Index 3 for sibcorr
   
   # Calculate confidence intervals
-  upcilib <- as.numeric(results$IOLIB[1]) + 1.96 * se_iolib
-  bottomcilib <- as.numeric(results$IOLIB[1]) - 1.96 * se_iolib
-  upcirad <- as.numeric(results$IORAD[3]) + 1.96 * se_iorad
-  bottomcirad <- as.numeric(results$IORAD[3]) - 1.96 * se_iorad
-  upcisib <- as.numeric(results$sibcorr[1]) + 1.96 * se_sibcorr
+  upcilib     <- as.numeric(results$IOLIB[1])   + 1.96 * se_iolib
+  bottomcilib <- as.numeric(results$IOLIB[1])   - 1.96 * se_iolib
+  upcirad     <- as.numeric(results$IORAD[3])   + 1.96 * se_iorad
+  bottomcirad <- as.numeric(results$IORAD[3])   - 1.96 * se_iorad
+  upcisib     <- as.numeric(results$sibcorr[1]) + 1.96 * se_sibcorr
   bottomcisib <- as.numeric(results$sibcorr[1]) - 1.96 * se_sibcorr
   
   # Return confidence intervals
@@ -245,6 +248,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
     panel.grid.minor = element_blank(),  # Remove minor grid lines
     plot.margin = margin(10, 10, 10, 10)  # Add space around the plot
   )
+
 # Save the plot
 ggsave("plots/results_plot_PGI.pdf", width = 13, height = 6, dpi = 300)
 pdf(NULL)
