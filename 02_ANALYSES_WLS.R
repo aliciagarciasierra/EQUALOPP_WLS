@@ -205,14 +205,14 @@ addWorksheet(wb, "For plotting")
 writeData(wb, "For plotting", ci_summary)
 
 # Save the workbook to an Excel file
-saveWorkbook(wb, "full_results.xlsx", overwrite = TRUE)
+saveWorkbook(wb, "results/full_results.xlsx", overwrite = TRUE)
 
 
 
 #---------------- Plot the graph
 
 # Read the data 
-data_graph <- read_excel("full_results.xlsx", sheet = "For plotting")
+data_graph <- read_excel("results/full_results.xlsx", sheet = "For plotting")
 
 # Set theme 
 set_pilot_family("Avenir Next Medium", title_family = "Avenir Next Demi Bold")
@@ -250,7 +250,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   )
 
 # Save the plot
-ggsave("plots/results_plot_PGI.pdf", width = 13, height = 6, dpi = 300)
+ggsave("plots/results_plot_PGI.png", width = 13, height = 6, dpi = 300)
 pdf(NULL)
 
 
