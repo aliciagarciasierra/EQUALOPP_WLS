@@ -6,11 +6,12 @@
 set.seed(123)
 source("00_MASTER_WLS.R")
 
-siblings <- readRDS("data/siblings.rds")
+final_datasets <-readRDS("data/final_datasets.rds")
 
-siblings <- siblings %>%
-  mutate_if(is.numeric, scale)
-
+#------------- check numeric
+final_datasets <- lapply(final_datasets, function(df) {
+  df %>% mutate_if(is.numeric, scale)
+})
 
 #-------------- models specifications
 ascr_vars    <- paste(ASCRIBED,     collapse=" + ")
@@ -22,9 +23,12 @@ m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
 famID   <- "+ (1 | familyID)"
 
 
+#--------------- redefine outcomes for results excluding health individual indices
 
-
-
+OUTCOMES <- c("education", "occupation","income", "wealth","health_pc")
+OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
+                   "income_ind" = "Income Ind", "income" = "Income", 
+                   "wealth" = "Wealth", "wealth_built" = "Built wealth", "health_pc" = "Health")
 
 
 #-------------- Function to compute the main indexes 
@@ -87,13 +91,28 @@ compute_indexes <- function(outcome_var, siblings) {
 #---------------- Store the results from the main analyses
 
 
-print("compute main results")
-all_results   <- mclapply(OUTCOMES, compute_indexes, siblings=siblings, mc.cores = 4)
-final_results <- do.call(rbind.data.frame, all_results)
+print("Compute main results over imputed datasets")
+
+# Apply function to each dataset in final_datasets
+all_results_list <- lapply(final_datasets, function(dataset) {
+  mclapply(OUTCOMES, compute_indexes, siblings = dataset, mc.cores = 4)
+})
+
+# Flatten the list of lists into a single data frame
+final_results <- do.call(rbind.data.frame, unlist(all_results_list, recursive = FALSE))
+
+# Compute the mean across imputed datasets
+final_avg_results <- final_results %>%
+  group_by(Outcome, Model) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE), .groups = "drop")
+
+# Print or return the final averaged results
+print(final_avg_results)
 
 
+################## CONTINUE HERE ##########################
 
-#---------- Function to compute confidence intervals through bootsrapping
+#---------- Function to compute confidence intervals through bootstrapping
 
 compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_var, results) {
   fit_model_and_compute_indexes <- function(bootstrap_data, indices) {
@@ -254,7 +273,7 @@ ggsave("plots/results_plot_PGI.png", width = 13, height = 6, dpi = 300)
 pdf(NULL)
 
 
-########### FOR PRESENTATION ##################
+################### GRAPHS SEPARATED BY OUTCOME #########################
 
 outcome_titles <- c(
   "education" = "Education with PGIs",

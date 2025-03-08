@@ -9,7 +9,6 @@
 
 # Data: WLS
 
-# Date of preparation of this script: Sept 2025
 
 #######################################################
 #########   PREPARE THE ENVIRONMENT ################
@@ -41,26 +40,28 @@ suppressPackageStartupMessages({
   library(missMDA)
   library(parallel)
   library(car)
+  library(mice)
+  library(parallel)
 })
 
 `%!in%` <- function(x, y) !(x %in% y)
+
 # SET WD 
 
-#setwd("/Users/agarcias/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/data")
-
+setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/EQUALOPP_WLS")
 
 # OPEN RAW DATA (first time)
 
-#data <- read_dta("wls_bl_14_03.dta") # main dataset
-#pgi_cog<- read_dta("Lee_idpub_shuffled.dta") # PGIs cognitive
-#pgi_noncog <- read_dta("Turley_idpub_shuffled.dta") # PGIs non-cognitive
+#data <- read_dta("data/wls_bl_14_03.dta") # main dataset
+#pgi_cog<- read_dta("data/Lee_idpub_shuffled.dta") # PGIs cognitive
+#pgi_noncog <- read_dta("data/Turley_idpub_shuffled.dta") # PGIs non-cognitive
 
 
 # SAVE IN RDA (for faster read following times)
 
-#saveRDS(data, file = "data.rds")
-#saveRDS(pgi_cog, file = "pgi_cog.rds")
-#saveRDS(pgi_noncog, file = "pgi_noncog.rds")
+#saveRDS(data, file = "data/data.rds")
+#saveRDS(pgi_cog, file = "data/pgi_cog.rds")
+#saveRDS(pgi_noncog, file = "data/pgi_noncog.rds")
 
 
 # GLOBALS 
@@ -68,11 +69,11 @@ INDICES <- c("Sibcorr","IOLIB", "IORAD")
 INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "IORAD" = "Radical IOP")
 
 # outcomes
-OUTCOMES <- c("education", "occupation","income", "wealth","health_pc")
+OUTCOMES <- c("education", "occupation","income", "wealth","health_self", "health_illness", "health_hospital", "health_pc")
 OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
   "income_ind" = "Income Ind", "income" = "Income", 
   "wealth" = "Wealth", "wealth_built" = "Built wealth", "health_self" = "Health Self-Rep", 
-  "health_illness" = "Health N Illnesses", "health_pc" = "Health")
+  "health_illness" = "Health N Illnesses", "health_hospital" ="Health Hospitalizations", "health_pc" = "Health")
 
 # ascribed
 ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "father_age_birth", "birth_order")
