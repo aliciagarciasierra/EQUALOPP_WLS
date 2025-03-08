@@ -12,8 +12,8 @@ if (!requireNamespace("patchwork", quietly = TRUE)) {
 library(patchwork)
 
 # Open lists with graphs
-plots_list_pgi <- readRDS("plots_list_pgi.rds")
-plots_list_obs <- readRDS("plots_list_obs.rds")
+plots_list_pgi <- readRDS("plots/plots_list_PGI.rds")
+plots_list_obs <- readRDS("plots/plots_list_observed.rds")
 
 # Combine the two plots for "education"
 combined_plot_education <- plots_list_pgi[["education"]] + 

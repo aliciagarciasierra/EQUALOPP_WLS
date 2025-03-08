@@ -6,9 +6,18 @@
 set.seed(123)
 source("00_MASTER_WLS.R")
 
+#------------- settings
+n_boot <- 3
+natural_talents <- "PGI" # or "observed"
+
+
+
+#------------- read data
 final_datasets <-readRDS("data/final_datasets.rds")
 
-#------------- check numeric
+
+
+#------------- scale numeric variables
 final_datasets <- lapply(final_datasets, function(df) {
   df %>% mutate_if(is.numeric, scale)
 })
@@ -16,11 +25,20 @@ final_datasets <- lapply(final_datasets, function(df) {
 #-------------- models specifications
 ascr_vars    <- paste(ASCRIBED,     collapse=" + ")
 pgi_vars     <- paste(PGIs, collapse=" + ")
+cog_vars     <- paste(OBSERVED_COG, collapse=" + ")
+noncog_vars  <- paste(OBSERVED_NON_COG, collapse=" + ")
 
 m0_vars <- "1"
-m1_vars <- paste0("(", pgi_vars, ")^2")
-m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
 famID   <- "+ (1 | familyID)"
+
+if(natural_talents == "PGI") {
+  m1_vars <- paste0("(", pgi_vars, ")^2")
+  m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
+  
+} else if(natural_talents == "observed") {
+  m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
+  m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
+}
 
 
 #--------------- redefine outcomes for results excluding health individual indices
@@ -77,7 +95,7 @@ compute_indexes <- function(outcome_var, siblings) {
     condfam = c(NA, condfam, NA),
     completeind = c(NA, NA, completeind),
     completefam = c(NA, NA, completefam),
-    sibcorr = c(sibcorr, NA, NA),
+    Sibcorr = c(sibcorr, NA, NA),
     condcorr = c(condcorr, NA, NA),
     w = c(w, NA, NA),
     v = c(v, NA, NA),
@@ -90,7 +108,6 @@ compute_indexes <- function(outcome_var, siblings) {
 
 #---------------- Store the results from the main analyses
 
-
 print("Compute main results over imputed datasets")
 
 # Apply function to each dataset in final_datasets
@@ -102,27 +119,26 @@ all_results_list <- lapply(final_datasets, function(dataset) {
 final_results <- do.call(rbind.data.frame, unlist(all_results_list, recursive = FALSE))
 
 # Compute the mean across imputed datasets
-final_avg_results <- final_results %>%
+final_results <- final_results %>%
   group_by(Outcome, Model) %>%
   summarise(across(where(is.numeric), mean, na.rm = TRUE), .groups = "drop")
 
 # Print or return the final averaged results
-print(final_avg_results)
+print(final_results)
 
 
-################## CONTINUE HERE ##########################
 
 #---------- Function to compute confidence intervals through bootstrapping
 
-compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_var, results) {
+compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
   fit_model_and_compute_indexes <- function(bootstrap_data, indices) {
     # Subset the data for this bootstrap sample
     data_sample <- bootstrap_data[indices, ]
     
     # Compute the models and the statistics (similar to compute_indexes function)
-    m0 <- lmer(as.formula(paste(outcome_var, "~", m0_vars, famID)), data = data_sample)
-    m1 <- lmer(as.formula(paste(outcome_var, "~", m1_vars, famID)), data = data_sample)
-    m2 <- lmer(as.formula(paste(outcome_var, "~", m2_vars, famID)), data = data_sample)
+    m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
+    m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data_sample)
+    m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, famID)), data = data_sample)
     
     # Extract variance components
     vcov_m0 <- as.data.frame(VarCorr(m0))
@@ -149,31 +165,27 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
     IORAD <- v + sibcorr
     
     # Return a numeric vector with the key statistics
-    return(c(IOLIB, IORAD, sibcorr))
+    return(c(sibcorr, IOLIB, IORAD))
   }
   
   # Run the bootstrapping
-  bootstrap_results <- boot(siblings, fit_model_and_compute_indexes, R = num_bootstrap_samples)
+  bootstrap_results <- boot(dataset, fit_model_and_compute_indexes, R = n_boot)
   
-  # Calculate standard errors for the bootstrapped estimates
-  se_iolib   <- sd(bootstrap_results$t[, 1])  # Index 1 for IOLIB
-  se_iorad   <- sd(bootstrap_results$t[, 2])  # Index 2 for IORAD
-  se_sibcorr <- sd(bootstrap_results$t[, 3])  # Index 3 for sibcorr
+  # filter outcome estimates
+  outcome_results <- filter(final_results, Outcome==outcome)
   
-  # Calculate confidence intervals
-  upcilib     <- as.numeric(results$IOLIB[1])   + 1.96 * se_iolib
-  bottomcilib <- as.numeric(results$IOLIB[1])   - 1.96 * se_iolib
-  upcirad     <- as.numeric(results$IORAD[3])   + 1.96 * se_iorad
-  bottomcirad <- as.numeric(results$IORAD[3])   - 1.96 * se_iorad
-  upcisib     <- as.numeric(results$sibcorr[1]) + 1.96 * se_sibcorr
-  bottomcisib <- as.numeric(results$sibcorr[1]) - 1.96 * se_sibcorr
+  # Calculate se and confidence intervals
+  rows <- lapply(1:length(INDICES), function(i) {
+    index <- INDICES[i]
+    se    <- sd(bootstrap_results$t[, i])
+    value <- outcome_results[index][!is.na(outcome_results[index])]  # only non Na value in column
+    up  <- value + 1.96 * se
+    low <- value - 1.96 * se
+    data.frame("Index"=index, "Outcome"=outcome, "Estimate"=value, "Lower"=low, "Upper"=up)
+  })
+  boot_results <- do.call(rbind,rows)
   
-  # Return confidence intervals
-  cis <- matrix(c(upcilib, upcirad, upcisib, bottomcilib, bottomcirad, bottomcisib), nrow = 3, ncol = 2)
-  rownames(cis) <- c("Liberal", "Radical", "Sibling correlation")
-  colnames(cis) <- c("Upper", "Lower")
-  
-  return(cis)
+  return(boot_results)
 }
 
 
@@ -181,34 +193,28 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
 
 # ------- compute bootstrapping
 
-print("compute bootstrapping")
-start = Sys.time()
-ci_list <- mclapply(OUTCOMES, function(outcome) {
-  outcome_results <- filter(final_results, Outcome==outcome)
-  bootstrap_results <- compute_indexes_bootstrap(siblings, num_bootstrap_samples = n_boot, outcome_var = outcome, results = outcome_results)
-  
-  # Get coefficients from the results
-  iolib   <- (outcome_results$IOLIB[1])  # Assuming IOLIB is in the first row for the outcome
-  iorad   <- (outcome_results$IORAD[3])   # Assuming IORAD is in the third row
-  sibcorr <- (outcome_results$sibcorr[1])  # Assuming sibcorr is in the first row
-  
-  # Populate the ci_summary data frame
-  rbind(data.frame(Index = "IOLIB", Lower = bootstrap_results["Liberal", "Lower"], Upper = bootstrap_results["Liberal", "Upper"], Estimate = iolib, Outcome = outcome),
-        data.frame(Index = "IORAD", Lower = bootstrap_results["Radical", "Lower"], Upper = bootstrap_results["Radical", "Upper"], Estimate = iorad, Outcome = outcome),
-        data.frame(Index = "Sibcorr", Lower = bootstrap_results["Sibling correlation", "Lower"], Upper = bootstrap_results["Sibling correlation", "Upper"], Estimate = sibcorr, Outcome = outcome))
-}, mc.cores = 4)
 
-stop = Sys.time()
-print(paste0(round(as.numeric(difftime(as.POSIXct(stop), as.POSIXct(start), units = "secs")), 3), " Seconds"))
+print("compute bootstrapping over imputed datasets")
 
-ci_summary <- do.call(rbind.data.frame, ci_list)
+# Apply function to each dataset in final_datasets
+all_boot_list <- lapply(final_datasets, function(dataset) {
+  mclapply(OUTCOMES, 
+           compute_indexes_bootstrap, 
+           dataset       = dataset, 
+           n_boot        = n_boot, 
+           final_results = final_results,
+           mc.cores = 4)
+})
 
+# Flatten the list of lists into a single data frame
+boot_results <- do.call(rbind.data.frame, unlist(all_boot_list, recursive = FALSE))
+
+# Compute the mean across imputed datasets
+boot_results <- boot_results %>%
+  group_by(Outcome, Index) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE), .groups = "drop")
 
 
-# Remove confidence intervals from the final_results
-final_results <- final_results[ , !names(final_results) %in% c("CI_Upper_IOLIB", "CI_Lower_IOLIB", 
-                                                               "CI_Upper_IORAD", "CI_Lower_IORAD",
-                                                               "CI_Upper_Sibcorr", "CI_Lower_Sibcorr")]
 
 #----------------Store bootstrapping results
 
@@ -221,17 +227,17 @@ writeData(wb, "Full results", final_results)
 
 # Add confidence intervals sheet
 addWorksheet(wb, "For plotting")
-writeData(wb, "For plotting", ci_summary)
+writeData(wb, "For plotting", boot_results)
 
 # Save the workbook to an Excel file
-saveWorkbook(wb, "results/full_results.xlsx", overwrite = TRUE)
+saveWorkbook(wb, paste0("results/full_results_",natural_talents,".xlsx"), overwrite = TRUE)
 
 
 
 #---------------- Plot the graph
 
 # Read the data 
-data_graph <- read_excel("results/full_results.xlsx", sheet = "For plotting")
+data_graph <- read_excel(paste0("results/full_results_",natural_talents,".xlsx"), sheet = "For plotting")
 
 # Set theme 
 set_pilot_family("Avenir Next Medium", title_family = "Avenir Next Demi Bold")
@@ -269,19 +275,22 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   )
 
 # Save the plot
-ggsave("plots/results_plot_PGI.png", width = 13, height = 6, dpi = 300)
+ggsave(paste0("plots/results_plot_",natural_talents,".png"), width = 13, height = 6, dpi = 300)
 pdf(NULL)
 
 
 ################### GRAPHS SEPARATED BY OUTCOME #########################
 
+title_nt <- switch(natural_talents,"PGI"="PGIs", "observed"="observed abilities")
 outcome_titles <- c(
-  "education" = "Education with PGIs",
-  "occupation" = "Occupation with PGIs",
-  "income" = "Household Income with PGIs",
-  "wealth" = "Household Wealth with PGIs",
-  "health_pc" = "Health with PGIs"
+  "education" = "Education with",
+  "occupation" = "Occupation with",
+  "income" = "Household Income with",
+  "wealth" = "Household Wealth with",
+  "health_pc" = "Health with"
 )
+outcome_titles <- paste(outcome_titles, title_nt)
+names(outcome_titles) <- OUTCOMES
 
 # Ensure outcomes variable matches your dataset's Outcome column
 outcomes <- unique(data_graph$Outcome)  # This will grab the unique outcomes from your data
@@ -335,4 +344,4 @@ for (outcome in outcomes) {
 print(plots_list_pgi[["education"]])
 
 # To save the list
-saveRDS(plots_list_pgi, "plots_list_pgi.rds")
+saveRDS(plots_list_pgi, paste0("plots/plots_list_",natural_talents,".rds"))

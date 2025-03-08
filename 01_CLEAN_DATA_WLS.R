@@ -232,7 +232,7 @@ siblings <- data %>%
          any_of(OUTCOMES),                              # outcomes
          any_of(PGI_COG),                               # PGIs cog
          any_of(PGI_NON_COG),                           # PGIs noncog
-         all_of(PC_COG),                                # principal components cog
+         all_of(PC_COG),                                # principal components
          any_of(OBSERVED_COG), any_of(OBSERVED_NON_COG), # observed abilities
   )
 
@@ -241,13 +241,23 @@ siblings <- siblings %>%
   mutate(across(everything(), ~ ifelse(is.nan(.), NA, .)))  # Applies to all columns
 
 # There are a few cases that are not labelled properly and show 3 or 4 siblings, delete them
-siblings<- siblings[!(siblings$withinID %in% c(3, 4)), ]
+siblings <- siblings[!(siblings$withinID %in% c(3, 4)), ]
+
+# check variables' types
+str(siblings)
+
+# convert familyID and sex to avoid scaling them
+siblings <- siblings %>% 
+  mutate(familyID = as.character(familyID),
+         sex      = as.factor(as.character(sex)))
 
 
 ########################## MULTIPLE IMPUTATION  ##########################
 
 # Perform multiple imputation
-imputed_data <- mice(siblings, m = 2, maxit = 2, method = 'cart', seed = 123) # When code is ready, use m=25, maxit=20
+imputed_data <- mice(siblings, m = 2, maxit = 2, 
+                     method = 'cart', seed = 123,
+                     ignore = OUTCOMES) # When code is ready, use m=25, maxit=20
 # We use cart because it's better for handling a mix of categorical and continuous variables than pmm
 
 # View imputed data summary
@@ -279,9 +289,9 @@ replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES) {
 imputed_datasets <- complete(imputed_data, action = "all")
 
 # Apply the function to each dataset in the imputed_datasets list
-imputed_datasets_without_y <- lapply(imputed_datasets, function(imputed_dataset) {
+imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
   replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES)
-})
+}, mc.cores = 4)
 
 # Check that in the imputed_datasets_without_y there are outcomes with NAs
 first_imputed_dataset <- imputed_datasets_without_y[[1]]

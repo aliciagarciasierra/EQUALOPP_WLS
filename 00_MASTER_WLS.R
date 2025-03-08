@@ -48,7 +48,7 @@ suppressPackageStartupMessages({
 
 # SET WD 
 
-setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/EQUALOPP_WLS")
+#setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/EQUALOPP_WLS")
 
 # OPEN RAW DATA (first time)
 
@@ -72,7 +72,7 @@ INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "I
 OUTCOMES <- c("education", "occupation","income", "wealth","health_self", "health_illness", "health_hospital", "health_pc")
 OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
   "income_ind" = "Income Ind", "income" = "Income", 
-  "wealth" = "Wealth", "wealth_built" = "Built wealth", "health_self" = "Health Self-Rep", 
+  "wealth" = "Wealth", "health_self" = "Health Self-Rep", 
   "health_illness" = "Health N Illnesses", "health_hospital" ="Health Hospitalizations", "health_pc" = "Health")
 
 # ascribed
@@ -93,8 +93,7 @@ PC_COG     <- paste0("pc", 1:10, "cog")
 #PC_NON_COG <- paste0("pc", 1:10, "noncog")
 
 
-# settings
-n_boot <- 100
+
 
 
 
