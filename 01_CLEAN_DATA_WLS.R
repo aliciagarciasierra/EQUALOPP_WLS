@@ -256,8 +256,7 @@ siblings <- siblings %>%
 
 # Perform multiple imputation
 imputed_data <- mice(siblings, m = 2, maxit = 2, 
-                     method = 'cart', seed = 123,
-                     ignore = OUTCOMES) # When code is ready, use m=25, maxit=20
+                     method = 'cart', seed = 123) # When code is ready, use m=25, maxit=20
 # We use cart because it's better for handling a mix of categorical and continuous variables than pmm
 
 # View imputed data summary
