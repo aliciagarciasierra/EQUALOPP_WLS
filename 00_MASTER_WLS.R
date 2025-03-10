@@ -93,6 +93,9 @@ PC_COG     <- paste0("pc", 1:10, "cog")
 #PC_NON_COG <- paste0("pc", 1:10, "noncog")
 
 
+# settings
+m <- 25
+
 
 
 

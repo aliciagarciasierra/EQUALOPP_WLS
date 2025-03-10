@@ -128,17 +128,19 @@ print(final_results)
 
 
 
-#---------- Function to compute confidence intervals through bootstrapping
+# ------- Compute bootstrapping for multiple datasets
 
-compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
-  fit_model_and_compute_indexes <- function(bootstrap_data, indices) {
-    # Subset the data for this bootstrap sample
-    data_sample <- bootstrap_data[indices, ]
-    
+print("compute bootstrapping over imputed datasets")
+
+# Define an function for MI + boot following (Schomaker et al, 2018)
+mi_boot <- function(final_datasets, outcome, m, n_boot) {
+  
+  # Function to be bootstrapped - returns all parameters of interest
+  est_fun <- function(data, indices) {
     # Compute the models and the statistics (similar to compute_indexes function)
-    m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
-    m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data_sample)
-    m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, famID)), data = data_sample)
+    m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data[indices, ])
+    m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data[indices, ])
+    m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, famID)), data = data[indices, ])
     
     # Extract variance components
     vcov_m0 <- as.data.frame(VarCorr(m0))
@@ -149,74 +151,95 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
     emptyind <- vcov_m0[2, 4]
     emptyfam <- vcov_m0[1, 4]
     totalvar <- emptyfam + emptyind
-    
     condind <- vcov_m1[2, 4]
     condfam <- vcov_m1[1, 4]
-    
     completeind <- vcov_m2[2, 4]
     completefam <- vcov_m2[1, 4]
-    
     sibcorr  <- emptyfam / totalvar
     condcorr <- condfam / totalvar
     w <- (condind - completeind) / totalvar
     v <- (emptyind - completeind) / totalvar
-    
     IOLIB <- w + condcorr
     IORAD <- v + sibcorr
     
-    # Return a numeric vector with the key statistics
-    return(c(sibcorr, IOLIB, IORAD))
+    # Return a numeric vector with the key statistics (same order as INDICES)
+    return(c("Sibcorr"=sibcorr,"IOLIB"=IOLIB, "IORAD"=IORAD))
   }
   
-  # Run the bootstrapping
-  bootstrap_results <- boot(dataset, fit_model_and_compute_indexes, R = n_boot)
-  
-  # filter outcome estimates
-  outcome_results <- filter(final_results, Outcome==outcome)
-  
-  # Calculate se and confidence intervals
-  rows <- lapply(1:length(INDICES), function(i) {
-    index <- INDICES[i]
-    se    <- sd(bootstrap_results$t[, i])
-    value <- outcome_results[index][!is.na(outcome_results[index])]  # only non Na value in column
-    up  <- value + 1.96 * se
-    low <- value - 1.96 * se
-    data.frame("Index"=index, "Outcome"=outcome, "Estimate"=value, "Lower"=low, "Upper"=up)
+  # Step 2: Bootstrap each imputed dataset
+  boot_results <- lapply(final_datasets, function(data_i) {
+    boot(data = data_i, statistic = est_fun, R = n_boot)
   })
-  boot_results <- do.call(rbind,rows)
   
-  return(boot_results)
+  # Extract coefficient matrices from each bootstrap
+  coef_matrices <- lapply(boot_results, function(boot_obj) boot_obj$t)
+  
+  # Get the coefficient names
+  coef_names <- INDICES
+  
+  # Calculate point estimates for each coefficient in each imputed dataset
+  point_estimates <- lapply(coef_matrices, colMeans)
+  
+  # Convert to a matrix for easier manipulation
+  point_estimates_matrix <- do.call(rbind, point_estimates)
+  colnames(point_estimates_matrix) <- coef_names
+  
+  # Step 3: Apply Rubin's rules for each coefficient
+  mi_boot_results <- lapply(1:length(coef_names), function(j) {
+    coef_name <- coef_names[j]
+    
+    # Point estimates for this coefficient across imputations
+    theta_i <- point_estimates_matrix[, j]
+    
+    # Calculate bootstrap standard deviations for this coefficient
+    boot_sds <- sapply(coef_matrices, function(mat) sd(mat[, j]))
+    
+    # Point estimate
+    theta_MI <- mean(theta_i)
+    
+    # Within-imputation variance (average bootstrap variance)
+    W <- mean(boot_sds^2)
+    
+    # Between-imputation variance
+    B <- var(theta_i)
+    
+    # Total variance
+    T_var <- W + (1 + 1/m) * B
+    
+    # Degrees of freedom for t-distribution
+    df <- (m - 1) * (1 + (W / ((1 + 1/m) * B)))^2
+    
+    # Confidence interval (95%)
+    ci_lower <- theta_MI - qt(0.975, df) * sqrt(T_var)
+    ci_upper <- theta_MI + qt(0.975, df) * sqrt(T_var)
+    
+    return(data.frame(
+      Index    = coef_name,
+      Outcome  = outcome,
+      Estimate = theta_MI,
+      Lower    = ci_lower, 
+      Upper    = ci_upper
+    ))
+  })
+  
+  mi_boot_results_df <- do.call(rbind, mi_boot_results)
+  
+  return(mi_boot_results_df)
 }
 
 
+# run for all the outcomes
+all_boot_list <- mclapply(OUTCOMES, mi_boot, 
+                          final_datasets = final_datasets, 
+                          m              = m, 
+                          n_boot         = n_boot,
+                          mc.cores = 4)
 
-
-# ------- compute bootstrapping
-
-
-print("compute bootstrapping over imputed datasets")
-
-# Apply function to each dataset in final_datasets
-all_boot_list <- lapply(final_datasets, function(dataset) {
-  mclapply(OUTCOMES, 
-           compute_indexes_bootstrap, 
-           dataset       = dataset, 
-           n_boot        = n_boot, 
-           final_results = final_results,
-           mc.cores = 4)
-})
-
-# Flatten the list of lists into a single data frame
-boot_results <- do.call(rbind.data.frame, unlist(all_boot_list, recursive = FALSE))
-
-# Compute the mean across imputed datasets
-boot_results <- boot_results %>%
-  group_by(Outcome, Index) %>%
-  summarise(across(where(is.numeric), mean, na.rm = TRUE), .groups = "drop")
+boot_results <- do.call(rbind, all_boot_list)
 
 
 
-#----------------Store bootstrapping results
+#----------------Store all results
 
 # Create a new Excel workbook
 wb <- createWorkbook()
@@ -243,7 +266,7 @@ data_graph <- read_excel(paste0("results/full_results_",natural_talents,".xlsx")
 set_pilot_family("Avenir Next Medium", title_family = "Avenir Next Demi Bold")
 
 # Custom order 
-data_graph$Index   <- factor(data_graph$Index, levels = INDICES)
+data_graph$Index   <- factor(data_graph$Index,   levels = INDICES)
 data_graph$Outcome <- factor(data_graph$Outcome, levels = OUTCOMES)
 
 # Create the bar graph
