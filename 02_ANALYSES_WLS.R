@@ -7,14 +7,15 @@ set.seed(123)
 source("00_MASTER_WLS.R")
 
 #------------- settings
-n_boot <- 3
-natural_talents <- "PGI" # or "observed"
+args = commandArgs(trailingOnly=TRUE)
+args <- strsplit(args, ",")
 
+natural_talents <- args[[1]]
+n_boot          <- args[[2]] %>% as.numeric()
 
 
 #------------- read data
 final_datasets <-readRDS("data/final_datasets.rds")
-
 
 
 #------------- scale numeric variables
@@ -22,10 +23,11 @@ final_datasets <- lapply(final_datasets, function(df) {
   df %>% mutate_if(is.numeric, scale)
 })
 
+
 #-------------- models specifications
-ascr_vars    <- paste(ASCRIBED,     collapse=" + ")
-pgi_vars     <- paste(PGIs, collapse=" + ")
-cog_vars     <- paste(OBSERVED_COG, collapse=" + ")
+ascr_vars    <- paste(ASCRIBED,         collapse=" + ")
+pgi_vars     <- paste(PGIs,             collapse=" + ")
+cog_vars     <- paste(OBSERVED_COG,     collapse=" + ")
 noncog_vars  <- paste(OBSERVED_NON_COG, collapse=" + ")
 
 m0_vars <- "1"
@@ -46,7 +48,7 @@ if(natural_talents == "PGI") {
 OUTCOMES <- c("education", "occupation","income", "wealth","health_pc")
 OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
                    "income_ind" = "Income Ind", "income" = "Income", 
-                   "wealth" = "Wealth", "wealth_built" = "Built wealth", "health_pc" = "Health")
+                   "wealth" = "Wealth", "health_pc" = "Health")
 
 
 #-------------- Function to compute the main indexes 
@@ -111,9 +113,9 @@ compute_indexes <- function(outcome_var, siblings) {
 print("Compute main results over imputed datasets")
 
 # Apply function to each dataset in final_datasets
-all_results_list <- lapply(final_datasets, function(dataset) {
+all_results_list <- mclapply(final_datasets, function(dataset) {
   mclapply(OUTCOMES, compute_indexes, siblings = dataset, mc.cores = 4)
-})
+},mc.cores = 4)
 
 # Flatten the list of lists into a single data frame
 final_results <- do.call(rbind.data.frame, unlist(all_results_list, recursive = FALSE))
@@ -132,8 +134,43 @@ print(final_results)
 
 print("compute bootstrapping over imputed datasets")
 
+# Function to be bootstrapped - returns all parameters of interest
+est_fun <- function(data, indices) {
+  # Compute the models and the statistics (similar to compute_indexes function)
+  m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data[indices, ])
+  m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data[indices, ])
+  m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, famID)), data = data[indices, ])
+  
+  # Extract variance components
+  vcov_m0 <- as.data.frame(VarCorr(m0))
+  vcov_m1 <- as.data.frame(VarCorr(m1))
+  vcov_m2 <- as.data.frame(VarCorr(m2))
+  
+  # Perform your index computations (same as in compute_indexes)
+  emptyind <- vcov_m0[2, 4]
+  emptyfam <- vcov_m0[1, 4]
+  totalvar <- emptyfam + emptyind
+  condind <- vcov_m1[2, 4]
+  condfam <- vcov_m1[1, 4]
+  completeind <- vcov_m2[2, 4]
+  completefam <- vcov_m2[1, 4]
+  sibcorr  <- emptyfam / totalvar
+  condcorr <- condfam / totalvar
+  w <- (condind - completeind) / totalvar
+  v <- (emptyind - completeind) / totalvar
+  IOLIB <- w + condcorr
+  IORAD <- v + sibcorr
+  
+  # Return a numeric vector with the key statistics (same order as INDICES)
+  return(c("Sibcorr"=sibcorr,"IOLIB"=IOLIB, "IORAD"=IORAD))
+}
+
+
+
+
+
 # Define an function for MI + boot following (Schomaker et al, 2018)
-mi_boot <- function(final_datasets, outcome, m, n_boot) {
+mi_boot <- function(data_list, outcome, m, n_boot) {
   
   # Function to be bootstrapped - returns all parameters of interest
   est_fun <- function(data, indices) {
@@ -166,23 +203,40 @@ mi_boot <- function(final_datasets, outcome, m, n_boot) {
     return(c("Sibcorr"=sibcorr,"IOLIB"=IOLIB, "IORAD"=IORAD))
   }
   
+
   # Step 2: Bootstrap each imputed dataset
-  boot_results <- lapply(final_datasets, function(data_i) {
-    boot(data = data_i, statistic = est_fun, R = n_boot)
-  })
+  boot_results <- mclapply(1:length(data_list), function(i) {
+    
+    # Write to a process-specific log file
+    log_msg <- paste("Process", Sys.getpid(), "- Data", i, "started at", Sys.time(), "\n")
+    cat(log_msg, file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
+    
+    # run
+    data_i <- data_list[[i]]
+    boot_res <- boot(data = data_i, statistic = est_fun, R = n_boot)
+    
+    # Log completion
+    cat(paste("Process", Sys.getpid(), "- Data", i, "completed at", Sys.time(), "\n"), 
+        file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
+    
+    # return results
+    return(boot_res)
+  }, mc.cores = 4)
   
-  # Extract coefficient matrices from each bootstrap
-  coef_matrices <- lapply(boot_results, function(boot_obj) boot_obj$t)
-  
+
   # Get the coefficient names
   coef_names <- INDICES
   
-  # Calculate point estimates for each coefficient in each imputed dataset
-  point_estimates <- lapply(coef_matrices, colMeans)
-  
-  # Convert to a matrix for easier manipulation
+  # Extract original estimates for each coefficient in each imputed dataset 
+  point_estimates <- lapply(boot_results, function(boot_obj) boot_obj$t0)
   point_estimates_matrix <- do.call(rbind, point_estimates)
-  colnames(point_estimates_matrix) <- coef_names
+  
+  # Extract bootstrapped coefficient matrices 
+  boot_matrices <- lapply(boot_results, function(boot_obj) {
+    colnames(boot_obj$t) <- coef_names
+    boot_obj$t
+    })
+  
   
   # Step 3: Apply Rubin's rules for each coefficient
   mi_boot_results <- lapply(1:length(coef_names), function(j) {
@@ -192,7 +246,7 @@ mi_boot <- function(final_datasets, outcome, m, n_boot) {
     theta_i <- point_estimates_matrix[, j]
     
     # Calculate bootstrap standard deviations for this coefficient
-    boot_sds <- sapply(coef_matrices, function(mat) sd(mat[, j]))
+    boot_sds <- sapply(boot_matrices, function(mat) sd(mat[, j]))
     
     # Point estimate
     theta_MI <- mean(theta_i)
@@ -228,15 +282,156 @@ mi_boot <- function(final_datasets, outcome, m, n_boot) {
 }
 
 
-# run for all the outcomes
-all_boot_list <- mclapply(OUTCOMES, mi_boot, 
-                          final_datasets = final_datasets, 
-                          m              = m, 
-                          n_boot         = n_boot,
-                          mc.cores = 4)
+# Define a function for MI + cluster bootstrap following (Schomaker et al, 2018)
+mi_cluster_boot <- function(data_list, outcome, n_boot) {
+  
+  # Function to be bootstrapped - returns all parameters of interest
+  est_fun <- function(data, indices) {
+    # Compute the models and the statistics
+    m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data[indices, ])
+    m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data[indices, ])
+    m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, famID)), data = data[indices, ])
+    
+    # Extract variance components
+    vcov_m0 <- as.data.frame(VarCorr(m0))
+    vcov_m1 <- as.data.frame(VarCorr(m1))
+    vcov_m2 <- as.data.frame(VarCorr(m2))
+    
+    # Perform index computations
+    emptyind <- vcov_m0[2, 4]
+    emptyfam <- vcov_m0[1, 4]
+    totalvar <- emptyfam + emptyind
+    condind <- vcov_m1[2, 4]
+    condfam <- vcov_m1[1, 4]
+    completeind <- vcov_m2[2, 4]
+    completefam <- vcov_m2[1, 4]
+    sibcorr  <- emptyfam / totalvar
+    condcorr <- condfam / totalvar
+    w <- (condind - completeind) / totalvar
+    v <- (emptyind - completeind) / totalvar
+    IOLIB <- w + condcorr
+    IORAD <- v + sibcorr
+    
+    # Return a numeric vector with the key statistics
+    return(c("Sibcorr"=sibcorr, "IOLIB"=IOLIB, "IORAD"=IORAD))
+  }
+  
+  # Cluster sampling function that respects family structure
+  # This generates indices for sampling at the family level
+  cluster_indices <- function(data) {
+    
+    # Get unique family IDs
+    family_ids <- unique(data[["familyID"]])
+    
+    # Sample families with replacement
+    sampled_families <- sample(family_ids, length(family_ids), replace = TRUE)
+    
+    # Create indices for all observations in the sampled families
+    indices <- numeric(0)
+    for (fam in sampled_families) {
+      fam_rows <- which(data[["familyID"]] == fam)
+      indices <- c(indices, fam_rows)
+    }
+    
+    return(indices)
+  }
+  
+  # Step 2: Bootstrap each imputed dataset
+  boot_results <- mclapply(1:length(data_list), function(i) {
+    
+    # Write to a process-specific log file
+    log_msg <- paste("Process", Sys.getpid(), "- Data", i, "started at", Sys.time(), "\n")
+    cat(log_msg, file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
+    
+    # run bootstrap with cluster sampling
+    data_i <- data_list[[i]]
+    boot_res <- boot(
+      data = data_i, 
+      statistic = est_fun, 
+      R = n_boot,
+      sim = "parametric",
+      ran.gen = function(data, p) data[cluster_indices(data), ],
+      mle = data_i  # Original data as MLE
+    )
+    
+    # Log completion
+    cat(paste("Process", Sys.getpid(), "- Data", i, "completed at", Sys.time(), "\n"), 
+        file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
+    
+    # return results
+    return(boot_res)
+  }, mc.cores = 4)
+  
+  # Get the coefficient names
+  coef_names <- INDICES
+  
+  # Extract original estimates for each coefficient in each imputed dataset 
+  point_estimates <- lapply(boot_results, function(boot_obj) boot_obj$t0)
+  point_estimates_matrix <- do.call(rbind, point_estimates)
+  
+  # Extract bootstrapped coefficient matrices 
+  boot_matrices <- lapply(boot_results, function(boot_obj) {
+    colnames(boot_obj$t) <- coef_names
+    boot_obj$t
+  })
+  
+  # Step 3: Apply Rubin's rules for each coefficient
+  mi_boot_results <- lapply(1:length(coef_names), function(j) {
+    coef_name <- coef_names[j]
+    
+    # Point estimates for this coefficient across imputations
+    theta_i <- point_estimates_matrix[, j]
+    
+    # Calculate bootstrap standard deviations for this coefficient
+    boot_sds <- sapply(boot_matrices, function(mat) sd(mat[, j]))
+    
+    # Point estimate
+    theta_MI <- mean(theta_i)
+    
+    # Within-imputation variance (average bootstrap variance)
+    W <- mean(boot_sds^2)
+    
+    # Between-imputation variance
+    B <- var(theta_i)
+    
+    # Total variance
+    T_var <- W + (1 + 1/length(data_list)) * B
+    
+    # Degrees of freedom for t-distribution
+    df <- (length(data_list) - 1) * (1 + (W / ((1 + 1/length(data_list)) * B)))^2
+    
+    # Confidence interval (95%)
+    ci_lower <- theta_MI - qt(0.975, df) * sqrt(T_var)
+    ci_upper <- theta_MI + qt(0.975, df) * sqrt(T_var)
+    
+    return(data.frame(
+      Index    = coef_name,
+      Outcome  = outcome,
+      Estimate = theta_MI,
+      Lower    = ci_lower, 
+      Upper    = ci_upper
+    ))
+  })
+  
+  mi_boot_results_df <- do.call(rbind, mi_boot_results)
+  
+  return(mi_boot_results_df)
+}
 
+# run for all the outcomes
+
+system.time({
+all_boot_list <- lapply(OUTCOMES, mi_boot, 
+                          data_list = final_datasets, 
+                          m              = m, 
+                          n_boot         = n_boot)
+})
 boot_results <- do.call(rbind, all_boot_list)
 
+
+# lapply in data_list:   91.217 
+# mclapply in data_list: 132.634
+# lapply in outcomes and mc in data_list: 66.497
 
 
 #----------------Store all results
