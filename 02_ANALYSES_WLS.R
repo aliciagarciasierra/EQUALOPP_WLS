@@ -282,10 +282,11 @@ mi_boot <- function(data_list, outcome, m, n_boot) {
 }
 
 
-# Define a function for MI + cluster bootstrap following (Schomaker et al, 2018)
+# Define a function for MI + boot following (Schomaker et al, 2018)
+# With cluster resampling
 mi_cluster_boot <- function(data_list, outcome, n_boot) {
   
-  # Function to be bootstrapped - returns all parameters of interest
+  # - 1 - Function to be bootstrapped 
   est_fun <- function(data, indices) {
     # Compute the models and the statistics
     m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data[indices, ])
@@ -316,8 +317,7 @@ mi_cluster_boot <- function(data_list, outcome, n_boot) {
     return(c("Sibcorr"=sibcorr, "IOLIB"=IOLIB, "IORAD"=IORAD))
   }
   
-  # Cluster sampling function that respects family structure
-  # This generates indices for sampling at the family level
+  # - 2 - Cluster sampling function that respects family structure
   cluster_indices <- function(data) {
     
     # Get unique family IDs
@@ -336,15 +336,18 @@ mi_cluster_boot <- function(data_list, outcome, n_boot) {
     return(indices)
   }
   
-  # Step 2: Bootstrap each imputed dataset
+  system.time({
+  # - 3 - Bootstrap each imputed dataset
   boot_results <- mclapply(1:length(data_list), function(i) {
     
     # Write to a process-specific log file
-    log_msg <- paste("Process", Sys.getpid(), "- Data", i, "started at", Sys.time(), "\n")
-    cat(log_msg, file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
+    #log_msg <- paste("Process", Sys.getpid(), "- Data", i, "started at", Sys.time(), "\n")
+    #cat(log_msg, file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
+    
+    # get one dataset
+    data_i <- data_list[[i]]
     
     # run bootstrap with cluster sampling
-    data_i <- data_list[[i]]
     boot_res <- boot(
       data = data_i, 
       statistic = est_fun, 
@@ -355,12 +358,22 @@ mi_cluster_boot <- function(data_list, outcome, n_boot) {
     )
     
     # Log completion
-    cat(paste("Process", Sys.getpid(), "- Data", i, "completed at", Sys.time(), "\n"), 
-        file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
+    #cat(paste("Process", Sys.getpid(), "- Data", i, "completed at", Sys.time(), "\n"), 
+    #    file = paste0("logs/",natural_talents,"/log_process_", Sys.getpid(), ".txt"), append = TRUE)
     
     # return results
     return(boot_res)
   }, mc.cores = 4)
+  })
+  
+  ##### TEST   #####
+  #boot_1 <- boot_results[[1]]
+  #i <- 2
+  #index <- boot_1$t[,i]
+  #hist(index, 
+  #     main = paste0("Histogram of ", INDICES[i], " - ", n_boot, " iters"))
+  
+  #####.#####  #####
   
   # Get the coefficient names
   coef_names <- INDICES
@@ -418,13 +431,109 @@ mi_cluster_boot <- function(data_list, outcome, n_boot) {
   return(mi_boot_results_df)
 }
 
+library(lme4)
+library(boot)
+library(parallel)
+
+# Define function for Multiple Imputation + Cluster Bootstrapping
+mi_cluster_boot <- function(data_list, outcome, n_boot) {
+  
+  # Function to estimate statistics from resampled data
+  est_fun <- function(data, indices) {
+    # Fit mixed models
+    m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, "+ (1|familyID)")), data = data[indices, ])
+    m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, "+ (1|familyID)")), data = data[indices, ])
+    m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, "+ (1|familyID)")), data = data[indices, ])
+    
+    # Extract variance components
+    vcov_m0 <- as.data.frame(VarCorr(m0))
+    vcov_m1 <- as.data.frame(VarCorr(m1))
+    vcov_m2 <- as.data.frame(VarCorr(m2))
+    
+    # Compute statistics
+    emptyind <- vcov_m0[vcov_m0$grp == "Residual", "vcov"]
+    emptyfam <- vcov_m0[vcov_m0$grp == "familyID", "vcov"]
+    totalvar <- emptyfam + emptyind
+    condind <- vcov_m1[vcov_m1$grp == "Residual", "vcov"]
+    condfam <- vcov_m1[vcov_m1$grp == "familyID", "vcov"]
+    completeind <- vcov_m2[vcov_m2$grp == "Residual", "vcov"]
+    completefam <- vcov_m2[vcov_m2$grp == "familyID", "vcov"]
+    
+    sibcorr <- emptyfam / totalvar
+    condcorr <- condfam / totalvar
+    w <- (condind - completeind) / totalvar
+    v <- (emptyind - completeind) / totalvar
+    IOLIB <- w + condcorr
+    IORAD <- v + sibcorr
+    
+    return(c("Sibcorr" = sibcorr, "IOLIB" = IOLIB, "IORAD" = IORAD))
+  }
+  
+  # Function to perform cluster resampling
+  cluster_indices <- function(data) {
+    sampled_families <- sample(unique(data$familyID), replace = TRUE)
+    return(unlist(lapply(sampled_families, function(fam) which(data$familyID == fam))))
+  }
+  
+  # Perform bootstrapping in parallel for each imputed dataset
+  boot_results <- mclapply(seq_along(data_list), function(i) {
+    boot(data = data_list[[i]], 
+         statistic = est_fun, 
+         R = n_boot, 
+         sim = "ordinary", 
+         stype = "i", 
+         ran.gen = function(data, p) data[cluster_indices(data), ])
+  }, mc.cores = detectCores() - 1)
+  
+  # Combine results using Rubin's rules
+  coef_names <- INDICES
+  point_estimates <- do.call(rbind, lapply(boot_results, function(boot_obj) boot_obj$t0))
+  
+  boot_matrices <- lapply(boot_results, function(boot_obj) {
+    colnames(boot_obj$t) <- coef_names
+    boot_obj$t
+  })
+  
+  mi_boot_results <- lapply(seq_along(coef_names), function(j) {
+    theta_i <- point_estimates[, j]
+    boot_sds <- sapply(boot_matrices, function(mat) sd(mat[, j]))
+    
+    theta_MI <- mean(theta_i)
+    W <- mean(boot_sds^2)
+    B <- var(theta_i)
+    T_var <- W + (1 + 1/length(data_list)) * B
+    df <- (length(data_list) - 1) * (1 + (W / ((1 + 1/length(data_list)) * B)))^2
+    ci_lower <- theta_MI - qt(0.975, df) * sqrt(T_var)
+    ci_upper <- theta_MI + qt(0.975, df) * sqrt(T_var)
+    
+    return(data.frame(
+      Index = coef_names[j],
+      Outcome = outcome,
+      Estimate = theta_MI,
+      Lower = ci_lower, 
+      Upper = ci_upper
+    ))
+  })
+  
+  return(do.call(rbind, mi_boot_results))
+}
+
+# Run for all outcomes
+data_list <- list(final_datasets[[1]])
+
+all_boot_list <- lapply(OUTCOMES, function(outcome) 
+  mi_cluster_boot(data_list = data_list, outcome = outcome, n_boot = n_boot))
+
+boot_results <- do.call(rbind, all_boot_list)
+
+
 # run for all the outcomes
 
 system.time({
 all_boot_list <- lapply(OUTCOMES, mi_boot, 
                           data_list = final_datasets, 
-                          m              = m, 
-                          n_boot         = n_boot)
+                          m         = m, 
+                          n_boot    = n_boot)
 })
 boot_results <- do.call(rbind, all_boot_list)
 
