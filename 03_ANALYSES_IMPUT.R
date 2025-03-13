@@ -11,7 +11,6 @@ n_boot <- 3
 natural_talents <- "PGI" # or "observed"
 
 
-
 #------------- read data
 final_datasets <-readRDS("data/final_datasets.rds")
 
@@ -40,13 +39,6 @@ if(natural_talents == "PGI") {
   m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
 }
 
-
-#--------------- redefine outcomes for results excluding health individual indices
-
-OUTCOMES <- c("education", "occupation","income", "wealth","health_pc")
-OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
-                   "income_ind" = "Income Ind", "income" = "Income", 
-                   "wealth" = "Wealth", "wealth_built" = "Built wealth", "health_pc" = "Health")
 
 
 #-------------- Function to compute the main indexes 

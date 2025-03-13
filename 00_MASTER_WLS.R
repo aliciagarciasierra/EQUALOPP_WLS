@@ -69,7 +69,7 @@ INDICES <- c("Sibcorr","IOLIB", "IORAD")
 INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "IORAD" = "Radical IOP")
 
 # outcomes
-OUTCOMES <- c("education", "occupation","income", "wealth","health_self", "health_illness", "health_hospital", "health_pc")
+OUTCOMES <- c("education", "occupation","income", "wealth", "health_pc")
 OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
   "income_ind" = "Income Ind", "income" = "Income", 
   "wealth" = "Wealth", "health_self" = "Health Self-Rep", 

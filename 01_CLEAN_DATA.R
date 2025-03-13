@@ -229,7 +229,7 @@ summary(select(data, any_of(OBSERVED_NON_COG)))
 siblings <- data %>%
   select(ID, familyID, withinID, pgiID,                 # IDs
          any_of(ASCRIBED),                              # demographics 
-         any_of(OUTCOMES),                              # outcomes
+         any_of(OUTCOMES_full),                              # outcomes
          any_of(PGI_COG),                               # PGIs cog
          any_of(PGI_NON_COG),                           # PGIs noncog
          all_of(PC_COG),                                # principal components
@@ -264,15 +264,15 @@ summary(imputed_data)
 
 #------ DELETE OUTCOME VALUES IMPUTED (FOLLOWING VON HIPPEL, 2007)
 # Count NAs for each outcome variable
-na_counts <- sapply(OUTCOMES, function(var) sum(is.na(siblings[[var]])))
+na_counts <- sapply(OUTCOMES_full, function(var) sum(is.na(siblings[[var]])))
 na_counts
 
 # Function to replace imputed outcome values with NA
-replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES) {
+replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES_full) {
   # Create a copy of the imputed dataset to modify
   clean_data <- imputed_data
   # Loop through each outcome variable
-  for (var in OUTCOMES) {
+  for (var in OUTCOMES_full) {
     if (var %in% names(siblings)) {
       # Find indices where the original data was NA but the imputed data has values
       imputed_indices <- which(!is.na(clean_data[[var]]) & is.na(siblings[[var]]))
@@ -289,7 +289,7 @@ imputed_datasets <- complete(imputed_data, action = "all")
 
 # Apply the function to each dataset in the imputed_datasets list
 imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
-  replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES)
+  replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES_full)
 }, mc.cores = 4)
 
 # Check that in the imputed_datasets_without_y there are outcomes with NAs
