@@ -518,7 +518,8 @@ mi_cluster_boot <- function(data_list, outcome, n_boot) {
   return(do.call(rbind, mi_boot_results))
 }
 
-# Run for all outcomes
+
+# Run for all outcomes  ----------------
 data_list <- list(final_datasets[[1]])
 
 all_boot_list <- lapply(OUTCOMES, function(outcome) 
@@ -527,7 +528,8 @@ all_boot_list <- lapply(OUTCOMES, function(outcome)
 boot_results <- do.call(rbind, all_boot_list)
 
 
-# run for all the outcomes
+
+# run for all the outcomes ----------------
 
 system.time({
 all_boot_list <- lapply(OUTCOMES, mi_boot, 
