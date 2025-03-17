@@ -1,5 +1,5 @@
 set.seed(123)
-source("00_MASTER_WLS.R")
+source("00_MASTER.R")
 
 
 #------------- settings

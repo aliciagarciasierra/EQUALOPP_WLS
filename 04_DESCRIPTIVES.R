@@ -3,8 +3,8 @@
 ###################### DESCRIPTIVES  ###########################################
 ###################################################################################
 
-source("00_MASTER_WLS.R")
-siblings <- readRDS("siblings.rds")
+source("00_MASTER.R")
+siblings <- readRDS("data/siblings.rds")
 
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
