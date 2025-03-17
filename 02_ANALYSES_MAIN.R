@@ -63,13 +63,13 @@ compute_indexes <- function(outcome_var, siblings) {
   completefam <- vcov_m2[1, 4]
   
   # Index computations
-  sibcorr <- emptyfam / totalvar
+  Sibcorr <- emptyfam / totalvar
   condcorr <- condfam / totalvar
   w <- (condind - completeind) / totalvar
   v <- (emptyind - completeind) / totalvar
   
   IOLIB <- w + condcorr
-  IORAD <- v + sibcorr
+  IORAD <- v + Sibcorr
   
   # Create results data frame
   result_df <- data.frame(
@@ -82,7 +82,7 @@ compute_indexes <- function(outcome_var, siblings) {
     condfam = c(NA, condfam, NA),
     completeind = c(NA, NA, completeind),
     completefam = c(NA, NA, completefam),
-    sibcorr = c(sibcorr, NA, NA),
+    Sibcorr = c(Sibcorr, NA, NA),
     condcorr = c(condcorr, NA, NA),
     w = c(w, NA, NA),
     v = c(v, NA, NA),
@@ -101,17 +101,18 @@ final_results <- do.call(rbind.data.frame, all_results)
 
 
 
-#---------- Function to compute confidence intervals through bootsrapping
+##---------- Function to compute confidence intervals through bootsrapping
 
-compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_var, results) {
+compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
+
   fit_model_and_compute_indexes <- function(bootstrap_data, indices) {
     # Subset the data for this bootstrap sample
     data_sample <- bootstrap_data[indices, ]
     
     # Compute the models and the statistics (similar to compute_indexes function)
-    m0 <- lmer(as.formula(paste(outcome_var, "~", m0_vars, famID)), data = data_sample)
-    m1 <- lmer(as.formula(paste(outcome_var, "~", m1_vars, famID)), data = data_sample)
-    m2 <- lmer(as.formula(paste(outcome_var, "~", m2_vars, famID)), data = data_sample)
+    m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
+    m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data_sample)
+    m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, famID)), data = data_sample)
     
     # Extract variance components
     vcov_m0 <- as.data.frame(VarCorr(m0))
@@ -129,68 +130,51 @@ compute_indexes_bootstrap <- function(siblings, num_bootstrap_samples, outcome_v
     completeind <- vcov_m2[2, 4]
     completefam <- vcov_m2[1, 4]
     
-    sibcorr  <- emptyfam / totalvar
+    Sibcorr  <- emptyfam / totalvar
     condcorr <- condfam / totalvar
     w <- (condind - completeind) / totalvar
     v <- (emptyind - completeind) / totalvar
     
     IOLIB <- w + condcorr
-    IORAD <- v + sibcorr
+    IORAD <- v + Sibcorr
     
     # Return a numeric vector with the key statistics
-    return(c(IOLIB, IORAD, sibcorr))
+    return(c(Sibcorr, IOLIB, IORAD))
   }
+
+  bootstrap_results <- boot(dataset, fit_model_and_compute_indexes, R = n_boot)
   
-  # Run the bootstrapping
-  bootstrap_results <- boot(siblings, fit_model_and_compute_indexes, R = num_bootstrap_samples)
+  # filter outcome estimates
+  outcome_results <- filter(final_results, Outcome==outcome)
   
-  # Calculate standard errors for the bootstrapped estimates
-  se_iolib   <- sd(bootstrap_results$t[, 1])  # Index 1 for IOLIB
-  se_iorad   <- sd(bootstrap_results$t[, 2])  # Index 2 for IORAD
-  se_sibcorr <- sd(bootstrap_results$t[, 3])  # Index 3 for sibcorr
+  # Calculate se and confidence intervals
+  rows <- lapply(1:length(INDICES), function(i) {
+    index <- INDICES[i]
+    se    <- sd(bootstrap_results$t[, i])
+    value <- outcome_results[index][!is.na(outcome_results[index])]  # only non Na value in column
+    up  <- value + 1.96 * se
+    low <- value - 1.96 * se
+    data.frame("Index"=index, "Outcome"=outcome, "Estimate"=value, "Lower"=low, "Upper"=up)
+  })
+  boot_results <- do.call(rbind,rows)
   
-  # Calculate confidence intervals
-  upcilib     <- as.numeric(results$IOLIB[1])   + 1.96 * se_iolib
-  bottomcilib <- as.numeric(results$IOLIB[1])   - 1.96 * se_iolib
-  upcirad     <- as.numeric(results$IORAD[3])   + 1.96 * se_iorad
-  bottomcirad <- as.numeric(results$IORAD[3])   - 1.96 * se_iorad
-  upcisib     <- as.numeric(results$sibcorr[1]) + 1.96 * se_sibcorr
-  bottomcisib <- as.numeric(results$sibcorr[1]) - 1.96 * se_sibcorr
-  
-  # Return confidence intervals
-  cis <- matrix(c(upcilib, upcirad, upcisib, bottomcilib, bottomcirad, bottomcisib), nrow = 3, ncol = 2)
-  rownames(cis) <- c("Liberal", "Radical", "Sibling correlation")
-  colnames(cis) <- c("Upper", "Lower")
-  
-  return(cis)
+  return(boot_results)
+
 }
 
 
-
-
-# ------- compute bootstrapping
-
 print("compute bootstrapping")
-system.time({
-  
-ci_list <- mclapply(OUTCOMES, function(outcome) {
-  outcome_results <- filter(final_results, Outcome==outcome)
-  bootstrap_results <- compute_indexes_bootstrap(siblings, num_bootstrap_samples = n_boot, outcome_var = outcome, results = outcome_results)
-  
-  # Get coefficients from the results
-  iolib   <- (outcome_results$IOLIB[1])  # Assuming IOLIB is in the first row for the outcome
-  iorad   <- (outcome_results$IORAD[3])   # Assuming IORAD is in the third row
-  sibcorr <- (outcome_results$sibcorr[1])  # Assuming sibcorr is in the first row
-  
-  # Populate the ci_summary data frame
-  rbind(data.frame(Index = "IOLIB", Lower = bootstrap_results["Liberal", "Lower"], Upper = bootstrap_results["Liberal", "Upper"], Estimate = iolib, Outcome = outcome),
-        data.frame(Index = "IORAD", Lower = bootstrap_results["Radical", "Lower"], Upper = bootstrap_results["Radical", "Upper"], Estimate = iorad, Outcome = outcome),
-        data.frame(Index = "Sibcorr", Lower = bootstrap_results["Sibling correlation", "Lower"], Upper = bootstrap_results["Sibling correlation", "Upper"], Estimate = sibcorr, Outcome = outcome))
-}, mc.cores = 4)
 
-})
+# Apply function to each dataset in final_datasets
+all_boot_list <- lapply(OUTCOMES, 
+                        compute_indexes_bootstrap, 
+                        dataset       = siblings, 
+                        n_boot        = n_boot, 
+                        final_results = final_results)
 
-ci_summary <- do.call(rbind.data.frame, ci_list)
+ci_summary <- do.call(rbind,all_boot_list)
+
+
 
 
 
