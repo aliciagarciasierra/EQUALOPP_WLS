@@ -439,6 +439,7 @@ print("your data is ready!")
 saveRDS(datafile, file = paste0("data/",dataname,".rds"))
 
 
+n_distinct(siblings$familyID)
 
 
 

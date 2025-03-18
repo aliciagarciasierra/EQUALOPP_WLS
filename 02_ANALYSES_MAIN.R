@@ -41,6 +41,7 @@ siblings <- siblings %>%
   mutate_if(is.numeric, scale)
 
 
+
 #-------------- models specifications
 ascr_vars    <- paste(ASCRIBED,     collapse=" + ")
 pgi_vars     <- paste(PGIs, collapse=" + ")
@@ -128,20 +129,22 @@ final_results <- do.call(rbind.data.frame, all_results)
 ##---------- Function to compute confidence intervals through bootsrapping
 
 compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
-
-  # Function to perform cluster resampling
-  cluster_indices <- function(data) {
-    sampled_families <- sample(unique(data$familyID), replace = TRUE)
-    return(unlist(lapply(sampled_families, function(fam) which(data$familyID == fam))))
-  }
+  
+  print(outcome)
   
   # Function to bootstrap
   est_fun <- function(bootstrap_data, indices) {
     # Subset the data for this bootstrap sample
     data_sample <- bootstrap_data[indices, ]
     
-    # Cluster resampling
-    if (cluster) data_sample <- cluster_data_boot(data_sample)
+    # Cluster re-sampling
+    if (cluster) {
+      # get family ID of sampled individuals
+      sampled_families <- unique(bootstrap_data$familyID)[indices]
+      
+      # get all siblings for each sampled individual
+      data_sample      <- bootstrap_data[bootstrap_data$familyID %in% sampled_families, ]
+    }
     
     # Compute the models and the statistics (similar to compute_indexes function)
     m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
@@ -176,12 +179,13 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
   
   
   # Run bootstrapping
-  sim_type <- ifelse(cluster, "parametric","ordinary")
+  #sim_type <- ifelse(cluster, "parametric","ordinary")
+  sim_type <- "ordinary"
   bootstrap_results <- boot(data      = dataset, 
                             statistic = est_fun, 
                             R         = n_boot, 
                             sim       = sim_type, 
-                            ran.gen = function(data, p) data[cluster_indices(data), ]
+                            #ran.gen = function(data, p) data[cluster_indices(data), ]
                             )
   
   # Filter original outcome estimates
@@ -219,12 +223,13 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
 print("compute bootstrapping")
 
 # Apply function to each dataset in final_datasets
-all_boot_list <- mclapply(OUTCOMES, 
-                          compute_indexes_bootstrap, 
-                          dataset       = siblings, 
-                          n_boot        = n_boot, 
-                          final_results = final_results,
-                          mc.cores = 4)
+all_boot_list <- lapply(OUTCOMES, 
+                        compute_indexes_bootstrap, 
+                        dataset       = siblings, 
+                        n_boot        = n_boot, 
+                        final_results = final_results
+                        #mc.cores = 4
+                        )
 
 ci_summary <- do.call(rbind,all_boot_list)
 

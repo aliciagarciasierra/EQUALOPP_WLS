@@ -97,6 +97,14 @@ PC_COG     <- paste0("pc", 1:10, "cog")
 
 
 # FUNCTIONS
+
+# Perform cluster resampling
+cluster_indices <- function(data) {
+  sampled_families <- sample(unique(data$familyID), replace = TRUE)
+  return(unlist(lapply(sampled_families, function(fam) which(data$familyID == fam))))
+}
+
+# Rename resampled families
 cluster_data_boot <- function(data) {
   data_sample <- data %>%
     group_by(familyID) %>%
