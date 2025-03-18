@@ -4,16 +4,42 @@
 ###################### DATA CLEANING AND RESHAPING #################
 #####################################################################
 
-source("00_MASTER_WLS.R")
+source("00_MASTER.R")
+
+# SETTINGS   ------------------
+script <- T
 
 
-# FAST READ FROM RDS
+# If script == F, specify manually the arguments:
+impute <- F
+m      <- 25
+
+
+# If script == T, the arguments are overwritten:
+if (script) {
+  args = commandArgs(trailingOnly=TRUE)
+  args <- strsplit(args, ",")
+  
+  if (length(args) == 0) {
+    args[[1]] <- F
+    args[[2]] <- 25
+  } else if (length(args) == 1) {
+    args[[2]] <- 25
+  }
+  
+  impute <- args[[1]] %>% as.logical()
+  m      <- args[[2]] %>% as.numeric()
+} 
+
+
+
+# FAST READ FROM RDS  ------------------
 
 data       <- readRDS("data/data.rds")
 pgi_cog    <- readRDS("data/pgi_cog.rds")
 pgi_noncog <- readRDS("data/pgi_noncog.rds")
 
-
+print("read raw data.")
 ############################ IDENTIFIERS ########################
 
 #--- first, an unique individual ID
@@ -229,7 +255,7 @@ summary(select(data, any_of(OBSERVED_NON_COG)))
 siblings <- data %>%
   select(ID, familyID, withinID, pgiID,                 # IDs
          any_of(ASCRIBED),                              # demographics 
-         any_of(OUTCOMES),                              # outcomes
+         any_of(OUTCOMES_full),                         # outcomes
          any_of(PGI_COG),                               # PGIs cog
          any_of(PGI_NON_COG),                           # PGIs noncog
          all_of(PC_COG),                                # principal components
@@ -246,64 +272,82 @@ siblings <- siblings[!(siblings$withinID %in% c(3, 4)), ]
 # check variables' types
 str(siblings)
 
-# convert familyID and sex to avoid scaling them
+# re-code IDs and sex to avoid scaling them
 siblings <- siblings %>% 
   mutate(familyID = as.character(familyID),
+         withinID = as.character(withinID),
          sex      = as.factor(as.character(sex)))
+
+# keep a copy before imputation
+siblings_full <- siblings 
+
+
+
+
 
 
 ########################## MULTIPLE IMPUTATION  ##########################
 
-# Perform multiple imputation
-imputed_data <- mice(siblings, m = m, maxit = 20, 
-                     method = 'cart', seed = 123) # When code is ready, use m=25, maxit=20
-# We use cart because it's better for handling a mix of categorical and continuous variables than pmm
+if (impute) {
 
-# View imputed data summary
-summary(imputed_data)
-
-#------ DELETE OUTCOME VALUES IMPUTED (FOLLOWING VON HIPPEL, 2007)
-# Count NAs for each outcome variable
-na_counts <- sapply(OUTCOMES, function(var) sum(is.na(siblings[[var]])))
-na_counts
-
-# Function to replace imputed outcome values with NA
-replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES) {
-  # Create a copy of the imputed dataset to modify
-  clean_data <- imputed_data
-  # Loop through each outcome variable
-  for (var in OUTCOMES) {
-    if (var %in% names(siblings)) {
-      # Find indices where the original data was NA but the imputed data has values
-      imputed_indices <- which(!is.na(clean_data[[var]]) & is.na(siblings[[var]]))
-      # Replace these imputed values with NA in the imputed dataset
-      clean_data[[var]][imputed_indices] <- NA
+  # Perform multiple imputation
+  imputed_data <- mice(siblings, m = m, maxit = 20, 
+                       method = 'cart', seed = 123) # When code is ready, use m=25, maxit=20
+  # We use cart because it's better for handling a mix of categorical and continuous variables than pmm
+  
+  # View imputed data summary
+  summary(imputed_data)
+  
+  #------ DELETE OUTCOME VALUES IMPUTED (FOLLOWING VON HIPPEL, 2007)
+  # Count NAs for each outcome variable
+  na_counts <- sapply(OUTCOMES, function(var) sum(is.na(siblings[[var]])))
+  na_counts
+  
+  # Function to replace imputed outcome values with NA
+  replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES) {
+    # Create a copy of the imputed dataset to modify
+    clean_data <- imputed_data
+    # Loop through each outcome variable
+    for (var in OUTCOMES) {
+      if (var %in% names(siblings)) {
+        # Find indices where the original data was NA but the imputed data has values
+        imputed_indices <- which(!is.na(clean_data[[var]]) & is.na(siblings[[var]]))
+        # Replace these imputed values with NA in the imputed dataset
+        clean_data[[var]][imputed_indices] <- NA
+      }
     }
+    
+    return(clean_data)
   }
   
-  return(clean_data)
+  # Extract imputed datasets from the imputed_data object (list of m datasets)
+  imputed_datasets <- complete(imputed_data, action = "all")
+  
+  # Apply the function to each dataset in the imputed_datasets list
+  imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
+    replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES)
+  }, mc.cores = 4)
+  
+  # Check that in the imputed_datasets_without_y there are outcomes with NAs
+  first_imputed_dataset <- imputed_datasets_without_y[[1]]
+  
+  
+  # If we want to select only complete observations without implementing multiple imputation:
+  #siblings <- siblings[complete.cases(siblings),] 
+  #n_distinct(siblings$ID)       # 5107
+  #n_distinct(siblings$familyID) # 4319
+  
+  print("finished imputation.")
 }
 
-# Extract imputed datasets from the imputed_data object (list of m datasets)
-imputed_datasets <- complete(imputed_data, action = "all")
-
-# Apply the function to each dataset in the imputed_datasets list
-imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
-  replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES)
-}, mc.cores = 4)
-
-# Check that in the imputed_datasets_without_y there are outcomes with NAs
-first_imputed_dataset <- imputed_datasets_without_y[[1]]
+# select imputed or original data before next steps
+data_list <- ifelse(impute, imputed_datasets_without_y, list(siblings_full))
 
 
-# If we want to select only complete observations without implementing multiple imputation:
-#siblings <- siblings[complete.cases(siblings),] 
-#n_distinct(siblings$ID)       # 5107
-#n_distinct(siblings$familyID) # 4319
 
 ########################## REMOVE THOSE WITH UNREALISTIC PARENTAL AGES  ##########################
 # Remove those with unrealistic parental ages
-filtered_datasets <- lapply(imputed_datasets_without_y, function(dataset) {
+filtered_datasets <- lapply(data_list, function(dataset) {
   dataset %>%
     filter(mother_age_birth >= 14 & father_age_birth >= 14)
 })
@@ -317,9 +361,13 @@ summary(first_imputed_dataset$father_age_birth) # works
 # Apply PCA to each filtered dataset
 final_datasets <- lapply(filtered_datasets, function(dataset) {
   
+  # Identify rows with complete information for all the other variables
+  health_vars <- c("health_self", "health_illness", "health_hospital")
+  other_vars  <- colnames(dataset)[colnames(dataset) %!in% health_vars]
+  final_analysis_rows <- complete.cases(dataset[, other_vars])
+  
   # Extract relevant health variables (you can adjust this list of variables if needed)
-  pcdata <- dataset %>%
-    select(ID, health_self, health_illness, health_hospital)
+  pcdata <- dataset[final_analysis_rows, c("ID",health_vars)]
   
   # Estimate the number of components to retain
   nb_comp <- estim_ncpPCA(pcdata %>% select(-ID)) 
@@ -338,8 +386,14 @@ final_datasets <- lapply(filtered_datasets, function(dataset) {
   pcdata <- pcdata %>%
     select(ID, health_pc)
   
+  # Remove missings from other variables
+  dataset <- dataset[final_analysis_rows, ]
+  
   # Merge the PCA results back to the original dataset
   dataset <- merge(dataset, pcdata, by = "ID", all.x = TRUE)
+  
+  # Remove health variables
+  dataset <- dataset %>% select(-all_of(health_vars))
   
   return(dataset)
 })
@@ -349,7 +403,7 @@ final_datasets <- lapply(filtered_datasets, function(dataset) {
 
 # Apply the filtering process to each dataset in the datasets_without_imputed_y list
 final_datasets <- lapply(final_datasets, function(dataset) {
-  dataset %>%
+  dataset  %>% 
     group_by(familyID) %>%
     filter(n() >= 2) %>%
     ungroup()
@@ -365,21 +419,24 @@ n_siblings_list <- lapply(final_datasets, function(dataset) {
   return(n_siblings)
 })
 
-#Check
+# Check
 n_siblings_first_dataset <- n_siblings_list[[1]]
 summary(n_siblings_first_dataset$count) # only 2
 
+
 ########################## SAVE ALL THE IMPUTED DATSETS  ##########################
+if (impute) {
+  datafile <- final_datasets
+  dataname <- "final_datasets"
+} else {
+  datalist <- final_datasets[1]
+  datafile <- datalist[[1]]
+  dataname <- "siblings"
+}
 
-saveRDS(final_datasets, file = "data/final_datasets.rds")
 
-
-
-
-
-
-
-
+print("your data is ready!")
+saveRDS(datafile, file = paste0("data/",dataname,".rds"))
 
 
 

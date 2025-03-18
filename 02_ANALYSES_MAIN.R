@@ -1,18 +1,42 @@
+#####################################################################
+###################### MAIN ANALYSES ################################
+#####################################################################
+
+
+rm(list=ls()) 
+
 set.seed(123)
 source("00_MASTER.R")
 
 
 #------------- settings
-args = commandArgs(trailingOnly=TRUE)
-args <- strsplit(args, ",")
+script <- T
 
-natural_talents <- args[[1]]
-n_boot          <- args[[2]] %>% as.numeric()
+# If script == F, specify manually the arguments:
+natural_talents <- "PGI" # or "observed"
+n_boot          <- 100
+cluster         <- T
+
+
+# If script == T, the arguments are overwritten:
+if (script) {
+  args = commandArgs(trailingOnly=TRUE)
+  args <- strsplit(args, ",")
+  
+  natural_talents <- args[[1]]
+  n_boot          <- args[[2]] %>% as.numeric()
+  cluster         <- args[[3]] %>% as.logical()
+} 
+
+cluster_lab <- ifelse(cluster,"_cluster","")
+  
+
 
 #------------- read data
 siblings <- readRDS("data/siblings.rds")
 
 
+#------------- rescale
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
 
@@ -44,26 +68,26 @@ compute_indexes <- function(outcome_var, siblings) {
   m0 <- lmer(as.formula(paste(outcome_var, "~", m0_vars, famID)), data = siblings)
   
   vcov_m0 <- as.data.frame(VarCorr(m0))
-  emptyind <- vcov_m0[2, 4]
-  emptyfam <- vcov_m0[1, 4]
-  totalvar <- (vcov_m0[1, 4] + vcov_m0[2, 4])
+  emptyind <- vcov_m0[vcov_m0$grp == "Residual", "vcov"]
+  emptyfam <- vcov_m0[vcov_m0$grp == "familyID", "vcov"]
+  totalvar <- emptyfam + emptyind
   
   # 2) CONDITIONAL MODEL
   m1 <- lmer(as.formula(paste(outcome_var, "~", m1_vars, famID)), data = siblings)
   
   vcov_m1 <- as.data.frame(VarCorr(m1))
-  condind <- vcov_m1[2, 4]
-  condfam <- vcov_m1[1, 4]
+  condind <- vcov_m1[vcov_m1$grp == "Residual", "vcov"]
+  condfam <- vcov_m1[vcov_m1$grp == "familyID", "vcov"]
   
   # 3) COMPLETE MODEL
   m2 <- lmer(as.formula(paste(outcome_var, "~", m2_vars, famID)), data = siblings)
   
   vcov_m2 <- as.data.frame(VarCorr(m2))
-  completeind <- vcov_m2[2, 4]
-  completefam <- vcov_m2[1, 4]
+  completeind <- vcov_m2[vcov_m2$grp == "Residual", "vcov"]
+  completefam <- vcov_m2[vcov_m2$grp == "familyID", "vcov"]
   
   # Index computations
-  Sibcorr <- emptyfam / totalvar
+  Sibcorr  <- emptyfam / totalvar
   condcorr <- condfam / totalvar
   w <- (condind - completeind) / totalvar
   v <- (emptyind - completeind) / totalvar
@@ -105,9 +129,19 @@ final_results <- do.call(rbind.data.frame, all_results)
 
 compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
 
-  fit_model_and_compute_indexes <- function(bootstrap_data, indices) {
+  # Function to perform cluster resampling
+  cluster_indices <- function(data) {
+    sampled_families <- sample(unique(data$familyID), replace = TRUE)
+    return(unlist(lapply(sampled_families, function(fam) which(data$familyID == fam))))
+  }
+  
+  # Function to bootstrap
+  est_fun <- function(bootstrap_data, indices) {
     # Subset the data for this bootstrap sample
     data_sample <- bootstrap_data[indices, ]
+    
+    # Cluster resampling
+    if (cluster) data_sample <- cluster_data_boot(data_sample)
     
     # Compute the models and the statistics (similar to compute_indexes function)
     m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
@@ -120,16 +154,14 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
     vcov_m2 <- as.data.frame(VarCorr(m2))
     
     # Perform your index computations (same as in compute_indexes)
-    emptyind <- vcov_m0[2, 4]
-    emptyfam <- vcov_m0[1, 4]
-    totalvar <- emptyfam + emptyind
-    
-    condind <- vcov_m1[2, 4]
-    condfam <- vcov_m1[1, 4]
-    
-    completeind <- vcov_m2[2, 4]
-    completefam <- vcov_m2[1, 4]
-    
+    emptyind    <- vcov_m0[vcov_m0$grp == "Residual", "vcov"]
+    emptyfam    <- vcov_m0[vcov_m0$grp == "familyID", "vcov"]
+    totalvar    <- emptyfam + emptyind
+    condind     <- vcov_m1[vcov_m1$grp == "Residual", "vcov"]
+    condfam     <- vcov_m1[vcov_m1$grp == "familyID", "vcov"]
+    completeind <- vcov_m2[vcov_m2$grp == "Residual", "vcov"]
+    completefam <- vcov_m2[vcov_m2$grp == "familyID", "vcov"]
+
     Sibcorr  <- emptyfam / totalvar
     condcorr <- condfam / totalvar
     w <- (condind - completeind) / totalvar
@@ -141,20 +173,41 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
     # Return a numeric vector with the key statistics
     return(c(Sibcorr, IOLIB, IORAD))
   }
-
-  bootstrap_results <- boot(dataset, fit_model_and_compute_indexes, R = n_boot)
   
-  # filter outcome estimates
+  
+  # Run bootstrapping
+  sim_type <- ifelse(cluster, "parametric","ordinary")
+  bootstrap_results <- boot(data      = dataset, 
+                            statistic = est_fun, 
+                            R         = n_boot, 
+                            sim       = sim_type, 
+                            ran.gen = function(data, p) data[cluster_indices(data), ]
+                            )
+  
+  # Filter original outcome estimates
   outcome_results <- filter(final_results, Outcome==outcome)
   
-  # Calculate se and confidence intervals
+  # Calculate SE and confidence intervals
   rows <- lapply(1:length(INDICES), function(i) {
     index <- INDICES[i]
-    se    <- sd(bootstrap_results$t[, i])
+    boots <- bootstrap_results$t[, i]
+    
+    # confidence intervals
+    se    <- sd(boots)
     value <- outcome_results[index][!is.na(outcome_results[index])]  # only non Na value in column
     up  <- value + 1.96 * se
     low <- value - 1.96 * se
-    data.frame("Index"=index, "Outcome"=outcome, "Estimate"=value, "Lower"=low, "Upper"=up)
+    
+    # bias
+    bias_values <- boots - value
+    
+    # Now bias_values contains the bias distribution
+    bias_mean <- mean(bias_values)
+    bias_sd   <- sd(bias_values)
+    
+    # results
+    data.frame("Index"=index, "Outcome"=outcome, "Estimate"=value, "Lower"=low, "Upper"=up,
+               "Bias_avg"=bias_mean, "Bias_se"=bias_sd)
   })
   boot_results <- do.call(rbind,rows)
   
@@ -166,22 +219,16 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
 print("compute bootstrapping")
 
 # Apply function to each dataset in final_datasets
-all_boot_list <- lapply(OUTCOMES, 
-                        compute_indexes_bootstrap, 
-                        dataset       = siblings, 
-                        n_boot        = n_boot, 
-                        final_results = final_results)
+all_boot_list <- mclapply(OUTCOMES, 
+                          compute_indexes_bootstrap, 
+                          dataset       = siblings, 
+                          n_boot        = n_boot, 
+                          final_results = final_results,
+                          mc.cores = 4)
 
 ci_summary <- do.call(rbind,all_boot_list)
 
 
-
-
-
-# Remove confidence intervals from the final_results
-final_results <- final_results[ , !names(final_results) %in% c("CI_Upper_IOLIB", "CI_Lower_IOLIB", 
-                                                               "CI_Upper_IORAD", "CI_Lower_IORAD",
-                                                               "CI_Upper_Sibcorr", "CI_Lower_Sibcorr")]
 
 #----------------Store bootstrapping results
 
@@ -197,7 +244,7 @@ addWorksheet(wb, "For plotting")
 writeData(wb, "For plotting", ci_summary)
 
 # Save the workbook to an Excel file
-saveWorkbook(wb, paste0("results/full_results_",natural_talents,".xlsx"), overwrite = TRUE)
+saveWorkbook(wb, paste0("results/main/full_results_",natural_talents,cluster_lab,".xlsx"), overwrite = TRUE)
 
 
 
@@ -205,7 +252,7 @@ saveWorkbook(wb, paste0("results/full_results_",natural_talents,".xlsx"), overwr
 #---------------- Plot the graph
 
 # Read the data 
-data_graph <- read_excel(paste0("results/full_results_",natural_talents,".xlsx"), sheet = "For plotting")
+data_graph <- read_excel(paste0("results/main/full_results_",natural_talents,cluster_lab,".xlsx"), sheet = "For plotting")
 
 
 # Set theme 
@@ -244,7 +291,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
   )
 
 # Save the plot
-ggsave(paste0("plots/results_plot_",natural_talents,".png"), width = 13, height = 6, dpi = 300)
+ggsave(paste0("plots/main/results_plot_",natural_talents,cluster_lab,".png"), width = 13, height = 6, dpi = 300)
 pdf(NULL)
 
 
@@ -313,4 +360,25 @@ for (outcome in outcomes) {
 print(plots_list_pgi[["education"]])
 
 # To save the list
-saveRDS(plots_list_pgi, paste0("plots/plots_list_",natural_talents,".rds"))
+saveRDS(plots_list_pgi, paste0("plots/main/by_outcome/plots_list_",natural_talents,cluster_lab,".rds"))
+
+
+
+
+
+################### CHECK BIAS #########################
+
+# Read the data 
+rows <- lapply(c(T,F), function(cluster) {
+  cluster_lab <- ifelse(cluster,"_cluster","")
+  read_excel(paste0("results/main/full_results_",natural_talents,cluster_lab,".xlsx"), sheet = "For plotting") %>%
+    select(Index,Outcome,Bias_avg) %>% mutate(sampling=ifelse(cluster,"cluster","simple"))
+})
+
+do.call(rbind,rows) %>%
+  ggplot(aes(x=Index,y=Bias_avg,color=sampling)) + geom_point(size=4) +
+  facet_wrap(~Outcome, nrow=1) +
+  labs(y="average bias") +
+  theme_bw()
+ggsave(paste0("plots/main/bias_",natural_talents,".pdf"), width = 13, height = 6, dpi = 300)
+

@@ -94,11 +94,34 @@ PC_COG     <- paste0("pc", 1:10, "cog")
 #PC_NON_COG <- paste0("pc", 1:10, "noncog")
 
 
-# settings
-m <- 25
 
 
-
-
+# FUNCTIONS
+cluster_data_boot <- function(data) {
+  data_sample <- data %>%
+    group_by(familyID) %>%
+    mutate(
+      # Create a sequence number for each appearance of this family
+      appearance = ceiling(row_number() / 2),
+      # Create new family ID with suffix for duplicates
+      new_familyID = if_else(
+        appearance == 1, 
+        familyID, 
+        paste0(familyID, letters[appearance - 1])
+      ),
+      new_ID = if_else(
+        appearance == 1, 
+        ID, 
+        paste0(ID, letters[appearance - 1])
+      )
+    ) %>% ungroup() %>% select(-familyID, -ID)
+  
+  # rename ID of family
+  data_sample <- data_sample %>% 
+    rename(familyID = new_familyID,
+           ID       = new_ID)
+  
+  return(data_sample)
+}
 
 
