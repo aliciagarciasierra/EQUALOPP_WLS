@@ -4,18 +4,18 @@
 
 
 rm(list=ls()) 
-
 set.seed(123)
 source("00_MASTER.R")
 
 
-#------------- settings
+########################## SETUP ####################################
+# ------- settings
+# Set to F if you want to run the code from Rstudio
 script <- T
 
 # If script == F, specify manually the arguments:
-natural_talents <- "PGI" # or "observed"
-n_boot          <- 100
-cluster         <- T
+natural_talents <- "PGI" # or "PGI"
+n_boot          <- 10
 
 
 # If script == T, the arguments are overwritten:
@@ -25,28 +25,21 @@ if (script) {
   
   natural_talents <- args[[1]]
   n_boot          <- args[[2]] %>% as.numeric()
-  cluster         <- args[[3]] %>% as.logical()
 } 
 
-cluster_lab <- ifelse(cluster,"_cluster","")
   
 
-
-#------------- read data
+# ------- read data
 siblings <- readRDS("data/siblings.rds")
 
 
-#------------- rescale
+# ------- rescale
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
 
 
 
-#-------------- models specifications
-ascr_vars    <- paste(ASCRIBED,     collapse=" + ")
-pgi_vars     <- paste(PGIs, collapse=" + ")
-cog_vars     <- paste(OBSERVED_COG, collapse=" + ")
-noncog_vars  <- paste(OBSERVED_NON_COG, collapse=" + ")
+# ------- models specifications
 
 m0_vars <- "1"
 famID   <- "+ (1 | familyID)"
@@ -61,131 +54,29 @@ if(natural_talents == "PGI") {
 }
 
 
-#-------------- Function to compute the main indexes 
 
-compute_indexes <- function(outcome_var, siblings) {
-  
-  # 1) NULL MODEL
-  m0 <- lmer(as.formula(paste(outcome_var, "~", m0_vars, famID)), data = siblings)
-  
-  vcov_m0 <- as.data.frame(VarCorr(m0))
-  emptyind <- vcov_m0[vcov_m0$grp == "Residual", "vcov"]
-  emptyfam <- vcov_m0[vcov_m0$grp == "familyID", "vcov"]
-  totalvar <- emptyfam + emptyind
-  
-  # 2) CONDITIONAL MODEL
-  m1 <- lmer(as.formula(paste(outcome_var, "~", m1_vars, famID)), data = siblings)
-  
-  vcov_m1 <- as.data.frame(VarCorr(m1))
-  condind <- vcov_m1[vcov_m1$grp == "Residual", "vcov"]
-  condfam <- vcov_m1[vcov_m1$grp == "familyID", "vcov"]
-  
-  # 3) COMPLETE MODEL
-  m2 <- lmer(as.formula(paste(outcome_var, "~", m2_vars, famID)), data = siblings)
-  
-  vcov_m2 <- as.data.frame(VarCorr(m2))
-  completeind <- vcov_m2[vcov_m2$grp == "Residual", "vcov"]
-  completefam <- vcov_m2[vcov_m2$grp == "familyID", "vcov"]
-  
-  # Index computations
-  Sibcorr  <- emptyfam / totalvar
-  condcorr <- condfam / totalvar
-  w <- (condind - completeind) / totalvar
-  v <- (emptyind - completeind) / totalvar
-  
-  IOLIB <- w + condcorr
-  IORAD <- v + Sibcorr
-  
-  # Create results data frame
-  result_df <- data.frame(
-    Outcome = outcome_var,
-    Model = c("NULL MODEL", "CONDITIONAL MODEL", "COMPLETE MODEL"),
-    emptyind = c(emptyind, NA, NA),
-    emptyfam = c(emptyfam, NA, NA),
-    totalvar = c(totalvar, NA, NA),
-    condind = c(NA, condind, NA),
-    condfam = c(NA, condfam, NA),
-    completeind = c(NA, NA, completeind),
-    completefam = c(NA, NA, completefam),
-    Sibcorr = c(Sibcorr, NA, NA),
-    condcorr = c(condcorr, NA, NA),
-    w = c(w, NA, NA),
-    v = c(v, NA, NA),
-    IOLIB = c(IOLIB, NA, NA),
-    IORAD = c(NA, NA, IORAD)
-  )
-  
-  return(result_df)
-}
-
-#---------------- Store the results from the main analyses
+######################## POINT VALUES ##############################
   
 print("compute main results")
-all_results   <- lapply(OUTCOMES, compute_indexes, siblings=siblings)
+
+# ------- Compute indices for all outcomes
+all_results   <- lapply(OUTCOMES, compute_indexes, data=siblings)
 final_results <- do.call(rbind.data.frame, all_results)
 
 
 
-##---------- Function to compute confidence intervals through bootsrapping
+##################### CONFIDENCE INTERVALS ############################
 
+# ------- Function to compute Cluster Bootstrapping
 compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
   
   print(outcome)
   
-  # Function to bootstrap
-  est_fun <- function(bootstrap_data, indices) {
-    # Subset the data for this bootstrap sample
-    data_sample <- bootstrap_data[indices, ]
-    
-    # Cluster re-sampling
-    if (cluster) {
-      # get family ID of sampled individuals
-      sampled_families <- unique(bootstrap_data$familyID)[indices]
-      
-      # get all siblings for each sampled individual
-      data_sample      <- bootstrap_data[bootstrap_data$familyID %in% sampled_families, ]
-    }
-    
-    # Compute the models and the statistics (similar to compute_indexes function)
-    m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
-    m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data_sample)
-    m2 <- lmer(as.formula(paste(outcome, "~", m2_vars, famID)), data = data_sample)
-    
-    # Extract variance components
-    vcov_m0 <- as.data.frame(VarCorr(m0))
-    vcov_m1 <- as.data.frame(VarCorr(m1))
-    vcov_m2 <- as.data.frame(VarCorr(m2))
-    
-    # Perform your index computations (same as in compute_indexes)
-    emptyind    <- vcov_m0[vcov_m0$grp == "Residual", "vcov"]
-    emptyfam    <- vcov_m0[vcov_m0$grp == "familyID", "vcov"]
-    totalvar    <- emptyfam + emptyind
-    condind     <- vcov_m1[vcov_m1$grp == "Residual", "vcov"]
-    condfam     <- vcov_m1[vcov_m1$grp == "familyID", "vcov"]
-    completeind <- vcov_m2[vcov_m2$grp == "Residual", "vcov"]
-    completefam <- vcov_m2[vcov_m2$grp == "familyID", "vcov"]
-
-    Sibcorr  <- emptyfam / totalvar
-    condcorr <- condfam / totalvar
-    w <- (condind - completeind) / totalvar
-    v <- (emptyind - completeind) / totalvar
-    
-    IOLIB <- w + condcorr
-    IORAD <- v + Sibcorr
-    
-    # Return a numeric vector with the key statistics
-    return(c(Sibcorr, IOLIB, IORAD))
-  }
-  
-  
   # Run bootstrapping
-  #sim_type <- ifelse(cluster, "parametric","ordinary")
-  sim_type <- "ordinary"
   bootstrap_results <- boot(data      = dataset, 
                             statistic = est_fun, 
-                            R         = n_boot, 
-                            sim       = sim_type, 
-                            #ran.gen = function(data, p) data[cluster_indices(data), ]
+                            outcome   = outcome,
+                            R         = n_boot
                             )
   
   # Filter original outcome estimates
@@ -202,16 +93,8 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
     up  <- value + 1.96 * se
     low <- value - 1.96 * se
     
-    # bias
-    bias_values <- boots - value
-    
-    # Now bias_values contains the bias distribution
-    bias_mean <- mean(bias_values)
-    bias_sd   <- sd(bias_values)
-    
     # results
-    data.frame("Index"=index, "Outcome"=outcome, "Estimate"=value, "Lower"=low, "Upper"=up,
-               "Bias_avg"=bias_mean, "Bias_se"=bias_sd)
+    data.frame("Index"=index, "Outcome"=outcome, "Estimate"=value, "Lower"=low, "Upper"=up)
   })
   boot_results <- do.call(rbind,rows)
   
@@ -222,7 +105,7 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome, final_results) {
 
 print("compute bootstrapping")
 
-# Apply function to each dataset in final_datasets
+# ------- Apply function to each outcome
 all_boot_list <- lapply(OUTCOMES, 
                         compute_indexes_bootstrap, 
                         dataset       = siblings, 
@@ -230,12 +113,12 @@ all_boot_list <- lapply(OUTCOMES,
                         final_results = final_results
                         #mc.cores = 4
                         )
-
 ci_summary <- do.call(rbind,all_boot_list)
 
 
 
-#----------------Store bootstrapping results
+
+##################### SAVE RESULTS ############################
 
 # Create a new Excel workbook
 wb <- createWorkbook()
@@ -249,15 +132,16 @@ addWorksheet(wb, "For plotting")
 writeData(wb, "For plotting", ci_summary)
 
 # Save the workbook to an Excel file
-saveWorkbook(wb, paste0("results/main/full_results_",natural_talents,cluster_lab,".xlsx"), overwrite = TRUE)
+saveWorkbook(wb, paste0("results/full_results_",natural_talents,".xlsx"), overwrite = TRUE)
 
 
 
 
-#---------------- Plot the graph
+
+######################### GRAPHS ###############################
 
 # Read the data 
-data_graph <- read_excel(paste0("results/main/full_results_",natural_talents,cluster_lab,".xlsx"), sheet = "For plotting")
+data_graph <- read_excel(paste0("results/full_results_",natural_talents,".xlsx"), sheet = "For plotting")
 
 
 # Set theme 
@@ -293,11 +177,13 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
     panel.grid.major = element_blank(),  # Remove major grid lines
     panel.grid.minor = element_blank(),  # Remove minor grid lines
     plot.margin = margin(10, 10, 10, 10)  # Add space around the plot
-  )
+  ) +
+  ylim(c(0,0.5))
 
 # Save the plot
-ggsave(paste0("plots/main/results_plot_",natural_talents,cluster_lab,".png"), width = 13, height = 6, dpi = 300)
+ggsave(paste0("plots/results_plot_",natural_talents,".png"), width = 13, height = 6, dpi = 300)
 pdf(NULL)
+
 
 
 ################### GRAPHS SEPARATED BY OUTCOME #########################
@@ -305,7 +191,6 @@ pdf(NULL)
 title_nt <- switch(natural_talents,"PGI"="PGIs", "observed"="observed abilities")
 outcome_titles <- c(
   "education" = "Education with",
-  "occupation" = "Occupation with",
   "income" = "Household Income with",
   "wealth" = "Household Wealth with",
   "health_pc" = "Health with"
@@ -365,7 +250,7 @@ for (outcome in outcomes) {
 print(plots_list_pgi[["education"]])
 
 # To save the list
-saveRDS(plots_list_pgi, paste0("plots/main/by_outcome/plots_list_",natural_talents,cluster_lab,".rds"))
+saveRDS(plots_list_pgi, paste0("plots/by_outcome/plots_list_",natural_talents,".rds"))
 
 
 
@@ -373,17 +258,110 @@ saveRDS(plots_list_pgi, paste0("plots/main/by_outcome/plots_list_",natural_talen
 
 ################### CHECK BIAS #########################
 
-# Read the data 
-rows <- lapply(c(T,F), function(cluster) {
-  cluster_lab <- ifelse(cluster,"_cluster","")
-  read_excel(paste0("results/main/full_results_",natural_talents,cluster_lab,".xlsx"), sheet = "For plotting") %>%
-    select(Index,Outcome,Bias_avg) %>% mutate(sampling=ifelse(cluster,"cluster","simple"))
-})
+# -- X deprecated X --
 
-do.call(rbind,rows) %>%
-  ggplot(aes(x=Index,y=Bias_avg,color=sampling)) + geom_point(size=4) +
-  facet_wrap(~Outcome, nrow=1) +
-  labs(y="average bias") +
-  theme_bw()
-ggsave(paste0("plots/main/bias_",natural_talents,".pdf"), width = 13, height = 6, dpi = 300)
+## Read the data 
+#rows <- lapply(c(T,F), function(cluster) {
+#  cluster_lab <- ifelse(cluster,"_cluster","")
+#  read_excel(paste0("results/full_results_",natural_talents,cluster_lab,".xlsx"), sheet = "For plotting") %>%
+#    select(Index,Outcome,Bias_avg) %>% mutate(sampling=ifelse(cluster,"cluster","simple"))
+#})
+#
+#do.call(rbind,rows) %>%
+#  ggplot(aes(x=Index,y=Bias_avg,color=sampling)) + geom_point(size=4) +
+#  facet_wrap(~Outcome, nrow=1) +
+#  labs(y="average bias") +
+#  theme_bw()
+#ggsave(paste0("plots/bias_",natural_talents,".pdf"), width = 13, height = 6, dpi = 300)
+
+
+
+
+################### CHECK SINGULARITY #########################
+if (!script) {
+  # Problem: occupation and observed ability
+  outcome_good <- "education"
+  data_sample <- siblings
+  
+  
+  # 0 check predictors distribution
+  cor_data <- select(data_sample, any_of(OBSERVED_NON_COG))
+  cors <- cor(cor_data)
+  ggcorrplot::ggcorrplot(cors, lab=T)
+  
+
+  
+  
+  # 2 Compare within-family variance  ---------------------
+  # --> "average within var occupation: 0.876"
+  W_var <- aggregate(education ~ familyID, data=data_sample, var) %>% summarise(avg_variance = mean(V1)) %>% pull(avg_variance)
+  print(paste("average within var  education:",round(W_var,3)))
+  # --> "average within var  education: 0.648"
+  W_var <- aggregate(income ~ familyID, data=data_sample, var) %>% summarise(avg_variance = mean(V1)) %>% pull(avg_variance)
+  print(paste("average within var  income:",round(W_var,3)))
+  # --> "average within var  income: 0.648"
+  W_var <- aggregate(wealth ~ familyID, data=data_sample, var) %>% summarise(avg_variance = mean(V1)) %>% pull(avg_variance)
+  print(paste("average within var  wealth:",round(W_var,3)))
+  # --> "average within var  wealth: 0.648"
+  
+  
+  
+  # 3 look at ICC  ----------------------
+  
+  null_model <- lmer(education ~ 1 + (1|familyID), data=data_sample)
+  icc <- VarCorr(null_model)$familyID[1] / (VarCorr(null_model)$familyID[1] + attr(VarCorr(null_model), "sc")^2)
+  print(paste("ICC education:",round(icc,3)))
+  # --> "ICC education: 0.353"
+  
+  null_model <- lmer(income ~ 1 + (1|familyID), data=data_sample)
+  icc <- VarCorr(null_model)$familyID[1] / (VarCorr(null_model)$familyID[1] + attr(VarCorr(null_model), "sc")^2)
+  print(paste("ICC income:",round(icc,3)))
+  # --> "ICC income: 0.167"
+  
+  null_model <- lmer(wealth ~ 1 + (1|familyID), data=data_sample)
+  icc <- VarCorr(null_model)$familyID[1] / (VarCorr(null_model)$familyID[1] + attr(VarCorr(null_model), "sc")^2)
+  print(paste("ICC wealth:",round(icc,3)))
+  # --> "ICC wealth: 0.231"
+  
+  null_model <- lmer(health_pc ~ 1 + (1|familyID), data=data_sample)
+  icc <- VarCorr(null_model)$familyID[1] / (VarCorr(null_model)$familyID[1] + attr(VarCorr(null_model), "sc")^2)
+  print(paste("ICC health_pc:",round(icc,3)))
+  # --> "ICC health_pc: 0.143"
+  
+  
+  
+  # 4 variance components ----------------------
+  
+  m0_vars <- "1"
+  famID   <- "+ (1 | familyID)"
+  
+  # occupation
+  # -- observed
+  m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
+  m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
+  
+  m0 <- lmer(as.formula(paste(outcome_problem, "~", m0_vars, famID)), data = data_sample)
+  m1 <- lmer(as.formula(paste(outcome_problem, "~", m1_vars, famID)), data = data_sample)
+  m2 <- lmer(as.formula(paste(outcome_problem, "~", m2_vars, famID)), data = data_sample)
+  vcov_m0 <- as.data.frame(VarCorr(m0))
+  vcov_m1 <- as.data.frame(VarCorr(m1))
+  vcov_m2 <- as.data.frame(VarCorr(m2))
+  
+  # -- PGI
+  m1_vars <- paste0("(", pgi_vars, ")^2")
+  m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
+  
+  m0 <- lmer(as.formula(paste(outcome_problem, "~", m0_vars, famID)), data = data_sample)
+  m1 <- lmer(as.formula(paste(outcome_problem, "~", m1_vars, famID)), data = data_sample)
+  m2 <- lmer(as.formula(paste(outcome_problem, "~", m2_vars, famID)), data = data_sample)
+  vcov_m0 <- as.data.frame(VarCorr(m0))
+  vcov_m1 <- as.data.frame(VarCorr(m1))
+  vcov_m2 <- as.data.frame(VarCorr(m2))
+
+}
+
+
+
+
+
 

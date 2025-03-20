@@ -7,11 +7,12 @@
 source("00_MASTER.R")
 
 # SETTINGS   ------------------
+# Set to F if you want to run the code from Rstudio
 script <- T
 
 
 # If script == F, specify manually the arguments:
-impute <- F
+impute <- T
 m      <- 25
 
 
@@ -22,15 +23,14 @@ if (script) {
   
   if (length(args) == 0) {
     args[[1]] <- F
-    args[[2]] <- 25
+    args[[2]] <- m
   } else if (length(args) == 1) {
-    args[[2]] <- 25
+    args[[2]] <- m
   }
   
   impute <- args[[1]] %>% as.logical()
   m      <- args[[2]] %>% as.numeric()
 } 
-
 
 
 # FAST READ FROM RDS  ------------------
@@ -39,7 +39,9 @@ data       <- readRDS("data/data.rds")
 pgi_cog    <- readRDS("data/pgi_cog.rds")
 pgi_noncog <- readRDS("data/pgi_noncog.rds")
 
-print("read raw data.")
+print("finished reading raw data.")
+
+
 ############################ IDENTIFIERS ########################
 
 #--- first, an unique individual ID
@@ -292,7 +294,7 @@ if (impute) {
 
   # Perform multiple imputation
   imputed_data <- mice(siblings, m = m, maxit = 20, 
-                       method = 'cart', seed = 123) # When code is ready, use m=25, maxit=20
+                       method = 'cart', seed = 123, printFlag=T) # When code is ready, use m=25, maxit=20
   # We use cart because it's better for handling a mix of categorical and continuous variables than pmm
   
   # View imputed data summary
@@ -300,15 +302,15 @@ if (impute) {
   
   #------ DELETE OUTCOME VALUES IMPUTED (FOLLOWING VON HIPPEL, 2007)
   # Count NAs for each outcome variable
-  na_counts <- sapply(OUTCOMES, function(var) sum(is.na(siblings[[var]])))
+  na_counts <- sapply(OUTCOMES_full, function(var) sum(is.na(siblings[[var]])))
   na_counts
   
   # Function to replace imputed outcome values with NA
-  replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES) {
+  replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES_full) {
     # Create a copy of the imputed dataset to modify
     clean_data <- imputed_data
     # Loop through each outcome variable
-    for (var in OUTCOMES) {
+    for (var in OUTCOMES_full) {
       if (var %in% names(siblings)) {
         # Find indices where the original data was NA but the imputed data has values
         imputed_indices <- which(!is.na(clean_data[[var]]) & is.na(siblings[[var]]))
@@ -325,12 +327,11 @@ if (impute) {
   
   # Apply the function to each dataset in the imputed_datasets list
   imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
-    replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES)
+    replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES_full)
   }, mc.cores = 4)
   
   # Check that in the imputed_datasets_without_y there are outcomes with NAs
-  first_imputed_dataset <- imputed_datasets_without_y[[1]]
-  
+  #first_imputed_dataset <- imputed_datasets_without_y[[1]]
   
   # If we want to select only complete observations without implementing multiple imputation:
   #siblings <- siblings[complete.cases(siblings),] 
@@ -340,8 +341,11 @@ if (impute) {
   print("finished imputation.")
 }
 
+
+
 # select imputed or original data before next steps
-data_list <- ifelse(impute, imputed_datasets_without_y, list(siblings_full))
+
+data_list <- switch(impute, T=imputed_datasets_without_y, F=list(siblings_full))
 
 
 
@@ -355,6 +359,7 @@ filtered_datasets <- lapply(data_list, function(dataset) {
 #Check
 first_imputed_dataset <- filtered_datasets[[1]]
 summary(first_imputed_dataset$father_age_birth) # works
+
 
 ########################## PRINCIPAL COMPONENTS FOR HEALTH  ##########################
 

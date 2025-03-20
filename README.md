@@ -4,4 +4,5 @@ In this way you can keep the data in the repository remotely, without publishing
 
 ## new points:
 - 02_ANALYSES_WLS.R now performs the analysis for both PGIs and observed abilities, you just have to set the value you want at the beginning of the script
+- Scripts 01, 02, and 03 can be run both from terminal and from Rstudio, by setting the argument 'script' (T or F). If F,  other arguments should be set.
 
