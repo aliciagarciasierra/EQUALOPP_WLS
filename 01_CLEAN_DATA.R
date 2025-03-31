@@ -8,7 +8,7 @@ source("00_MASTER.R")
 
 # SETTINGS   ------------------
 # Set to F if you want to run the code from Rstudio
-script <- T
+script <- F
 
 
 # If script == F, specify manually the arguments:
@@ -104,9 +104,9 @@ missing_summary <- data %>%
 
 
 EDU         <- c(education_1       = "z_edeqyr",   education_2       = "z_rb004red", education_3      = "z_gb103red", education_4   = "z_hb103red") # years of education
-OCCU        <- c(occu_3            = "z_ocsxcru2", occu_4           = "sfu57ref") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
+OCCU        <- c(occu_3            = "z_ocsxcru2", occu_4            = "sfu57ref") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
 INC_IND     <- c(income_ind_5      = "z_gp250rec", income_ind_6      = "z_hpu50rec") # individual level income (total personal income)
-INC         <- c(income_5       = "z_gp260hec", income_6       = "z_hpu60hec") # household level income (total household income)
+INC         <- c(income_5          = "z_gp260hec", income_6          = "z_hpu60hec") # household level income (total household income)
 WEALTH      <- c(wealth_4          = "z_rr043rec", wealth_5          = "z_gr100rpc", wealth_6         = "z_hr100rpc")  # wealth (net worth at the family level)
 HEALTH_S    <- c(health_self_4     = "z_mx001rer", health_self_5     = "z_ix001rer", health_self_6    = "z_jx001rer", health_self_7 = "z_q1x001rer") # self-reported health (from 1 very poor to 5 excellent)
 HEALTH_ILL  <- c(health_illness_4  = "z_mx117rec", health_illness_5  = "z_ix117rec", health_illness_6 = "z_jx117rec") # total number of illnesses
@@ -290,6 +290,18 @@ siblings_full <- siblings
 
 ########################## MULTIPLE IMPUTATION  ##########################
 
+# check number of missings in each variable
+missing_percentage <- function(df) {
+  missing_df <- data.frame(Variable = names(df),
+                           Percent_Missing = colMeans(is.na(df)) * 100
+                           )
+  missing_df <- missing_df[order(missing_df$Percent_Missing, decreasing = TRUE), ]
+  rownames(missing_df) <- NULL
+  return(missing_df)
+}
+
+missing_percentage(siblings)
+
 if (impute) {
 
   # Perform multiple imputation
@@ -344,7 +356,6 @@ if (impute) {
 
 
 # select imputed or original data before next steps
-
 data_list <- switch(impute, T=imputed_datasets_without_y, F=list(siblings_full))
 
 

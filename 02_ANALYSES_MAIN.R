@@ -32,7 +32,6 @@ if (script) {
 # ------- read data
 siblings <- readRDS("data/siblings.rds")
 
-
 # ------- rescale
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
