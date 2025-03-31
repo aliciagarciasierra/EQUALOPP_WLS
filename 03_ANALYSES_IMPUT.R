@@ -155,6 +155,7 @@ all_boot_list <- lapply(OUTCOMES,
                         data_list = data_list, 
                         n_boot    = n_boot)
 })
+
 boot_results <- do.call(rbind, all_boot_list)
 
 
@@ -181,6 +182,7 @@ saveWorkbook(wb, paste0("results/full_results_",natural_talents,"_MI.xlsx"), ove
 
 # Read the data 
 data_graph <- read_excel(paste0("results/full_results_",natural_talents,"_MI.xlsx"), sheet = "For plotting")
+
 
 # Set theme 
 set_pilot_family("Avenir Next Medium", title_family = "Avenir Next Demi Bold")
@@ -220,6 +222,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
 
 # Save the plot
 ggsave(paste0("plots/results_plot_",natural_talents,"_MI.png"), width = 13, height = 6, dpi = 300)
+
 pdf(NULL)
 
 

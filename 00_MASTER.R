@@ -65,8 +65,6 @@ suppressPackageStartupMessages({
 
 
 
-
-
 ########################## GLOBALS ####################################
 
 INDICES <- c("Sibcorr","IOLIB", "IORAD")
@@ -105,6 +103,7 @@ ascr_vars    <- paste(ASCRIBED,         collapse=" + ")
 pgi_vars     <- paste(PGIs,             collapse=" + ")
 cog_vars     <- paste(OBSERVED_COG,     collapse=" + ")
 noncog_vars  <- paste(OBSERVED_NON_COG, collapse=" + ")
+
 
 
 

@@ -14,6 +14,7 @@ if (!requireNamespace("patchwork", quietly = TRUE)) {
 library(patchwork)
 
 
+
 # save all plots in png --------------------
 lapply(c(T,F), function(impute) {
   
@@ -73,3 +74,4 @@ combined_plot <- plots_list_pgi[[outcome]] +
   ) 
 # Display the combined plot
 print(combined_plot)
+

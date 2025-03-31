@@ -4,6 +4,7 @@
 
 
 rm(list=ls()) 
+
 set.seed(123)
 source("00_MASTER.R")
 
@@ -33,6 +34,7 @@ if (script) {
 siblings <- readRDS("data/siblings.rds")
 
 # ------- rescale
+
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
 
@@ -110,8 +112,8 @@ all_boot_list <- lapply(OUTCOMES,
                         dataset       = siblings, 
                         n_boot        = n_boot, 
                         final_results = final_results
-                        #mc.cores = 4
                         )
+
 ci_summary <- do.call(rbind,all_boot_list)
 
 
@@ -178,6 +180,7 @@ ggplot(data_graph, aes(x = Outcome, y = Estimate, fill = Index)) +
     plot.margin = margin(10, 10, 10, 10)  # Add space around the plot
   ) +
   ylim(c(0,0.5))
+
 
 # Save the plot
 ggsave(paste0("plots/results_plot_",natural_talents,".png"), width = 13, height = 6, dpi = 300)
@@ -279,7 +282,6 @@ saveRDS(plots_list_pgi, paste0("plots/by_outcome/plots_list_",natural_talents,".
 ################### CHECK SINGULARITY #########################
 if (!script) {
   # Problem: occupation and observed ability
-  outcome_good <- "education"
   data_sample <- siblings
   
   
@@ -289,7 +291,6 @@ if (!script) {
   ggcorrplot::ggcorrplot(cors, lab=T)
   
 
-  
   
   # 2 Compare within-family variance  ---------------------
   # --> "average within var occupation: 0.876"
@@ -327,39 +328,8 @@ if (!script) {
   print(paste("ICC health_pc:",round(icc,3)))
   # --> "ICC health_pc: 0.143"
   
-  
-  
-  # 4 variance components ----------------------
-  
-  m0_vars <- "1"
-  famID   <- "+ (1 | familyID)"
-  
-  # occupation
-  # -- observed
-  m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
-  m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
-  
-  m0 <- lmer(as.formula(paste(outcome_problem, "~", m0_vars, famID)), data = data_sample)
-  m1 <- lmer(as.formula(paste(outcome_problem, "~", m1_vars, famID)), data = data_sample)
-  m2 <- lmer(as.formula(paste(outcome_problem, "~", m2_vars, famID)), data = data_sample)
-  vcov_m0 <- as.data.frame(VarCorr(m0))
-  vcov_m1 <- as.data.frame(VarCorr(m1))
-  vcov_m2 <- as.data.frame(VarCorr(m2))
-  
-  # -- PGI
-  m1_vars <- paste0("(", pgi_vars, ")^2")
-  m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
-  
-  m0 <- lmer(as.formula(paste(outcome_problem, "~", m0_vars, famID)), data = data_sample)
-  m1 <- lmer(as.formula(paste(outcome_problem, "~", m1_vars, famID)), data = data_sample)
-  m2 <- lmer(as.formula(paste(outcome_problem, "~", m2_vars, famID)), data = data_sample)
-  vcov_m0 <- as.data.frame(VarCorr(m0))
-  vcov_m1 <- as.data.frame(VarCorr(m1))
-  vcov_m2 <- as.data.frame(VarCorr(m2))
 
 }
-
-
 
 
 
