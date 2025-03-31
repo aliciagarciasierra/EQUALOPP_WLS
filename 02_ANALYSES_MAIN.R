@@ -12,7 +12,7 @@ source("00_MASTER.R")
 ########################## SETUP ####################################
 # ------- settings
 # Set to F if you want to run the code from Rstudio
-script <- T
+script <- F
 
 # If script == F, specify manually the arguments:
 natural_talents <- "PGI" # or "PGI"

@@ -8,12 +8,12 @@ source("00_MASTER.R")
 
 # SETTINGS   ------------------
 # Set to F if you want to run the code from Rstudio
-script <- F
+script <- T
 
 
 
 # If script == F, specify manually the arguments:
-impute <- T
+impute <- F
 m      <- 25
 
 
@@ -360,7 +360,7 @@ if (impute) {
 
 
 # select imputed or original data before next steps
-data_list <- switch(impute, T=imputed_datasets_without_y, F=list(siblings_full))
+data_list <- if (impute) imputed_datasets_without_y else list(siblings_full)
 
 
 
