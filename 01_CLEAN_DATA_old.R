@@ -1,3 +1,5 @@
+
+
 #####################################################################
 ###################### DATA CLEANING AND RESHAPING #################
 #####################################################################
@@ -6,12 +8,11 @@ source("00_MASTER.R")
 
 # SETTINGS   ------------------
 # Set to F if you want to run the code from Rstudio
-script <- F
-
+script <- T
 
 
 # If script == F, specify manually the arguments:
-impute <- F
+impute <- T
 m      <- 25
 
 
@@ -103,9 +104,9 @@ missing_summary <- data %>%
 
 
 EDU         <- c(education_1       = "z_edeqyr",   education_2       = "z_rb004red", education_3      = "z_gb103red", education_4   = "z_hb103red") # years of education
-OCCU        <- c(occu_3            = "z_ocsxcru2", occu_4            = "sfu57ref") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
+OCCU        <- c(occu_3            = "z_ocsxcru2", occu_4           = "sfu57ref") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
 INC_IND     <- c(income_ind_5      = "z_gp250rec", income_ind_6      = "z_hpu50rec") # individual level income (total personal income)
-INC         <- c(income_5          = "z_gp260hec", income_6          = "z_hpu60hec") # household level income (total household income)
+INC         <- c(income_5       = "z_gp260hec", income_6       = "z_hpu60hec") # household level income (total household income)
 WEALTH      <- c(wealth_4          = "z_rr043rec", wealth_5          = "z_gr100rpc", wealth_6         = "z_hr100rpc")  # wealth (net worth at the family level)
 HEALTH_S    <- c(health_self_4     = "z_mx001rer", health_self_5     = "z_ix001rer", health_self_6    = "z_jx001rer", health_self_7 = "z_q1x001rer") # self-reported health (from 1 very poor to 5 excellent)
 HEALTH_ILL  <- c(health_illness_4  = "z_mx117rec", health_illness_5  = "z_ix117rec", health_illness_6 = "z_jx117rec") # total number of illnesses
@@ -140,7 +141,7 @@ data <- data %>%
     health_self     = rowMeans(select(., all_of(names(HEALTH_S))),    na.rm=TRUE),
     health_illness  = rowMeans(select(., all_of(names(HEALTH_ILL))),  na.rm=TRUE),
     health_hospital = rowMeans(select(., all_of(names(HEALTH_HOSP))), na.rm=TRUE)
-  )
+    )
 
 
 ########################## PGIs cognitive ######################################
@@ -289,23 +290,8 @@ siblings_full <- siblings
 
 ########################## MULTIPLE IMPUTATION  ##########################
 
-# check number of missings in each variable
-missing_percentage <- function(df) {
-  missing_df <- data.frame(Variable = names(df),
-                           Percent_Missing = colMeans(is.na(df)) * 100
-  )
-  missing_df <- missing_df[order(missing_df$Percent_Missing, decreasing = TRUE), ]
-  rownames(missing_df) <- NULL
-  return(missing_df)
-}
-
-missing_percentage(siblings)
-
-
-
-
 if (impute) {
-  
+
   # Perform multiple imputation
   imputed_data <- mice(siblings, m = m, maxit = 20, 
                        method = 'cart', seed = 123, printFlag=T) # When code is ready, use m=25, maxit=20
@@ -358,7 +344,8 @@ if (impute) {
 
 
 # select imputed or original data before next steps
-data_list <- if (impute) imputed_datasets_without_y else list(siblings_full)
+
+data_list <- switch(impute, T=imputed_datasets_without_y, F=list(siblings_full))
 
 
 
@@ -385,7 +372,7 @@ final_datasets <- lapply(filtered_datasets, function(dataset) {
   final_analysis_rows <- complete.cases(dataset[, other_vars])
   
   # Extract relevant health variables (you can adjust this list of variables if needed)
-  pcdata <- dataset[final_analysis_rows, c("ID", health_vars)]
+  pcdata <- dataset[final_analysis_rows, c("ID",health_vars)]
   
   # Estimate the number of components to retain
   nb_comp <- estim_ncpPCA(pcdata %>% select(-ID)) 
@@ -427,11 +414,6 @@ final_datasets <- lapply(final_datasets, function(dataset) {
     ungroup()
 })
 
-# Check number of observations
-first_dataset <- final_datasets[[1]]
-nrow(first_dataset)
-
-
 # Count the number of siblings in each family for all datasets in final_datasets
 n_siblings_list <- lapply(final_datasets, function(dataset) {
   n_siblings <- dataset %>% 
@@ -442,10 +424,9 @@ n_siblings_list <- lapply(final_datasets, function(dataset) {
   return(n_siblings)
 })
 
-# Check siblings
+# Check
 n_siblings_first_dataset <- n_siblings_list[[1]]
 summary(n_siblings_first_dataset$count) # only 2
-
 
 
 ########################## SAVE ALL THE IMPUTED DATSETS  ##########################
@@ -464,3 +445,7 @@ saveRDS(datafile, file = paste0("data/",dataname,".rds"))
 
 
 n_distinct(siblings$familyID)
+
+
+
+

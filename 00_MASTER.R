@@ -16,7 +16,7 @@
 
 # CLEAN
 
-rm(list=ls()) 
+#rm(list=ls()) 
 
 # LOAD PACKAGES
 

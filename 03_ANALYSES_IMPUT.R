@@ -32,6 +32,12 @@ if (script) {
 data_list <-readRDS("data/final_datasets.rds")
 
 
+# check sample size and families
+data_example <- data_list[[1]]
+n_distinct(data_example$ID)
+n_distinct(data_example$familyID)
+
+
 # ------- scale numeric variables
 data_list <- lapply(data_list, function(df) {
   df %>% mutate_if(is.numeric, scale)
