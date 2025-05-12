@@ -70,19 +70,27 @@ suppressPackageStartupMessages({
 INDICES <- c("Sibcorr","IOLIB", "IORAD")
 INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "IORAD" = "Radical IOP")
 
-# outcomes
-OUTCOMES <- c("education","income", "wealth", "health_pc")
-OUTCOMES_full <- c("education", "income", "wealth","health_self", "health_illness", "health_hospital", "health_pc")
-OUTCOMES.labs <- c("education" = "Education", "occupation" = "Occupation", 
-  "income_ind" = "Income Ind", "income" = "Income", 
-  "wealth" = "Wealth", "health_self" = "Health Self-Rep", 
-  "health_illness" = "Health N Illnesses", "health_hospital" ="Health Hospitalizations", "health_pc" = "Health")
+# Outcomes
+# Used for the analysis:
+OUTCOMES      <- c("education", "income", "wealth", "health_pc")
+# All outcomes:
+OUTCOMES_full <- c("education", "income", "wealth", "health_self", "health_illness", "health_hospital", "health_pc")
+OUTCOMES.labs <- c("education"       = "Education", 
+                   "occupation"      = "Occupation", 
+                   "income"          = "Income Ind.",
+                   "wealth"          = "Wealth", 
+                   "health_self"     = "Health Self-Rep", 
+                   "health_illness"  = "Health N Illnesses", 
+                   "health_hospital" = "Health Hospitalizations", 
+                   "health_pc"       = "Health")
 
-# ascribed
+# Ascribed characteristics
 ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "father_age_birth", "birth_order")
 
-# ability
-ABILITY_DEFS <- c("polygenic indices", "observed ability")
+# Natural talents
+NT      = c("PGIs", "observed")
+nt.labs = c("PGI"     = "PGIs", 
+            "observed"= "observed abilities")
 
 # - observed
 OBSERVED_NON_COG <- c("extraversion", "openness", "neuroticism", "conscientiousness", "agreeableness")
@@ -112,7 +120,9 @@ noncog_vars  <- paste(OBSERVED_NON_COG, collapse=" + ")
 ########################## FUNCTIONS ####################################
 
 #-------------- Function to compute the main indexes 
-compute_indexes <- function(outcome, data) {
+compute_indexes <- function(outcome, data, m0_vars, m1_vars, m2_vars) {
+  
+  famID   <- "+ (1 | familyID)"
   
   # 1) NULL MODEL
   m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data)
@@ -170,6 +180,9 @@ compute_indexes <- function(outcome, data) {
 
 #-------------- Function to be bootstrapped
 est_fun <- function(data, indices, outcome) {
+  
+  famID   <- "+ (1 | familyID)"
+  
   # Subset the data for this bootstrap sample
   data_sample <- data[indices, ]
   

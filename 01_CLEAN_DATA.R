@@ -8,7 +8,7 @@ source("00_MASTER.R")
 
 # SETTINGS   ------------------
 # Set to F if you want to run the code from Rstudio
-script <- T
+script <- F
 
 
 
@@ -107,7 +107,7 @@ missing_summary <- data %>%
 EDU         <- c(education_1       = "z_edeqyr",   education_2       = "z_rb004red", education_3      = "z_gb103red", education_4   = "z_hb103red") # years of education
 OCCU        <- c(occu_3            = "z_ocsxcru2", occu_4            = "sfu57ref") # occupation (measured as 1970 Duncan SEI, note the 1970 because there are more)
 INC_IND     <- c(income_ind_5      = "z_gp250rec", income_ind_6      = "z_hpu50rec") # individual level income (total personal income)
-INC         <- c(income_5          = "z_gp260hec", income_6          = "z_hpu60hec") # household level income (total household income)
+INC_HH      <- c(income_5          = "z_gp260hec", income_6          = "z_hpu60hec") # household level income (total household income)
 WEALTH      <- c(wealth_4          = "z_rr043rec", wealth_5          = "z_gr100rpc", wealth_6         = "z_hr100rpc")  # wealth (net worth at the family level)
 HEALTH_S    <- c(health_self_4     = "z_mx001rer", health_self_5     = "z_ix001rer", health_self_6    = "z_jx001rer", health_self_7 = "z_q1x001rer") # self-reported health (from 1 very poor to 5 excellent)
 HEALTH_ILL  <- c(health_illness_4  = "z_mx117rec", health_illness_5  = "z_ix117rec", health_illness_6 = "z_jx117rec") # total number of illnesses
@@ -116,7 +116,7 @@ HEALTH_HOSP <- c(health_hospital_4 = "z_mx008rer", health_hospital_5 = "z_ixhi08
 
 
 # Rename
-data <- data %>% rename(!!!EDU, !!!OCCU, !!!INC_IND, !!!INC, !!!WEALTH, !!!HEALTH_S, !!!HEALTH_ILL, !!!HEALTH_HOSP)
+data <- data %>% rename(!!!EDU, !!!OCCU, !!!INC_IND, !!!INC_HH, !!!WEALTH, !!!HEALTH_S, !!!HEALTH_ILL, !!!HEALTH_HOSP)
 
 
 # Clean (sending negative values to NA)
@@ -127,23 +127,99 @@ data <- data %>%
 
 # -- other (all negative)
 data <- data %>%
-  mutate_at(vars(names(EDU), names(OCCU), names(INC_IND), names(INC), names(HEALTH_S), names(HEALTH_ILL), names(HEALTH_HOSP)),
+  mutate_at(vars(names(EDU), names(OCCU), names(INC_IND), names(INC_HH), names(HEALTH_S), names(HEALTH_ILL), names(HEALTH_HOSP)),
             ~ ifelse(. < 0, NA, .))
 
 
-# Combine averaging to have more stable measures
-data <- data %>%
-  mutate(
-    education       = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
-    occupation      = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
-    income_ind      = rowMeans(select(., all_of(names(INC_IND))),     na.rm=TRUE),
-    income          = rowMeans(select(., all_of(names(INC))),         na.rm=TRUE),
-    wealth          = rowMeans(select(., all_of(names(WEALTH))),      na.rm=TRUE),
-    health_self     = rowMeans(select(., all_of(names(HEALTH_S))),    na.rm=TRUE),
-    health_illness  = rowMeans(select(., all_of(names(HEALTH_ILL))),  na.rm=TRUE),
-    health_hospital = rowMeans(select(., all_of(names(HEALTH_HOSP))), na.rm=TRUE)
-    )
 
+# Age at each wave
+data <- data %>% mutate(
+  age_w4 = 1993 - birth_year,
+  age_w5 = 2004 - birth_year,
+  age_w6 = 2011 - birth_year,
+  age_w7 = 2020 - birth_year
+)
+
+select(data, contains("age_w")) %>% summary()
+
+#    age_w4          age_w5          age_w6          age_w7      
+# Min.   :33.00   Min.   :44.00   Min.   :51.00   Min.   : 60.00  
+# Median :54.00   Median :65.00   Median :72.00   Median : 81.00  
+# Mean   :53.66   Mean   :64.66   Mean   :71.66   Mean   : 80.66  
+# Max.   :75.00   Max.   :86.00   Max.   :93.00   Max.   :102.00  
+
+
+##########  Age filter ##########  
+
+min_income = 45
+max_income = 65
+
+min_wealth = 55
+max_wealth = 70
+
+min_health = 50
+max_health = 65
+
+# Years between waves
+delta45 <- 11
+delta56 <- 7
+delta67 <- 9
+
+
+data <- data %>% mutate(
+  education   = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
+  occupation  = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
+  income      = case_when(age_w5 >= min_income          & age_w5 <= (max_income-delta56) ~ rowMeans(select(., income_ind_5, income_ind_6), na.rm=TRUE),
+                          age_w5 > (max_income-delta56) & age_w5 <= max_income           ~ income_ind_5,
+                          age_w6 >= min_income          & age_w6 <= max_income           ~ income_ind_6,
+                          ),
+  wealth      = case_when(age_w4 >= min_wealth          & age_w4 <= (max_wealth-delta45) ~ rowMeans(select(., wealth_4, wealth_5), na.rm=TRUE),
+                          age_w4 > (max_wealth-delta45) & age_w4 <= max_wealth           ~ wealth_4,
+                          age_w5 >= min_wealth          & age_w5 <= (max_wealth-delta56) ~ rowMeans(select(., wealth_5, wealth_6), na.rm=TRUE),
+                          age_w5 > (max_wealth-delta56) & age_w5 <= max_wealth           ~ wealth_5,
+                          age_w6 >= min_wealth          & age_w6 <= max_wealth           ~ wealth_6
+                          ),
+  health_self = case_when(age_w4 >= min_health          & age_w4 <= (max_health-delta45) ~ rowMeans(select(., health_self_4, health_self_5), na.rm=TRUE),
+                          age_w4 > (max_health-delta45) & age_w4 <=  max_health          ~ health_self_4,
+                          age_w5 >= min_health          & age_w5 <= (max_health-delta56) ~ rowMeans(select(., health_self_5, health_self_6), na.rm=TRUE),
+                          age_w5 > (max_health-delta56) & age_w5 <=  max_health          ~ health_self_5,
+                          age_w6 >= min_health          & age_w6 <= (max_health-delta67) ~ rowMeans(select(., health_self_6, health_self_7), na.rm=TRUE),
+                          age_w6 > (max_health-delta67) & age_w6 <=  max_health          ~ health_self_6,
+                          age_w7 >= min_health          & age_w7 <=  max_health          ~ health_self_7
+                          ),
+  health_illness = case_when(age_w4 >= min_health       & age_w4 <= (max_health-delta45) ~ rowMeans(select(., health_illness_4, health_illness_5), na.rm=TRUE),
+                          age_w4 > (max_health-delta45) & age_w4 <=  max_health          ~ health_illness_4,
+                          age_w5 >= min_health          & age_w5 <= (max_health-delta56) ~ rowMeans(select(., health_illness_5, health_illness_6), na.rm=TRUE),
+                          age_w5 > (max_health-delta56) & age_w5 <=  max_health          ~ health_illness_5,
+                          age_w6 >= min_health          & age_w6 <=  max_health          ~ health_illness_6
+                          ),
+  health_hospital = case_when(age_w4 >= min_health      & age_w4 <= (max_health-delta45) ~ rowMeans(select(., health_hospital_4, health_hospital_5), na.rm=TRUE),
+                          age_w4 > (max_health-delta45) & age_w4 <=  max_health          ~ health_hospital_4,
+                          age_w5 >= min_health          & age_w5 <=  max_health          ~ health_hospital_5
+                          )
+)
+
+
+
+summary(select(data, any_of(OUTCOMES_full)))
+
+
+
+
+## Combine averaging to have more stable measures
+#data <- data %>%
+#  mutate(
+#    education       = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
+#    occupation      = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
+#    income          = rowMeans(select(., all_of(names(INC_IND))),     na.rm=TRUE),
+#    wealth          = rowMeans(select(., all_of(names(WEALTH))),      na.rm=TRUE),
+#    health_self     = rowMeans(select(., all_of(names(HEALTH_S))),    na.rm=TRUE),
+#    health_illness  = rowMeans(select(., all_of(names(HEALTH_ILL))),  na.rm=TRUE),
+#    health_hospital = rowMeans(select(., all_of(names(HEALTH_HOSP))), na.rm=TRUE)
+#    )
+#
+#
+#summary(select(data, any_of(OUTCOMES_full)))
 
 ########################## PGIs cognitive ######################################
 
@@ -252,215 +328,247 @@ data <- data %>%
 summary(select(data, any_of(OBSERVED_NON_COG)))
 
 
-########################## SELECT FINAL VARIABLES  ##########################
-
-# Select all the relevant variables to extract them from the sample
-siblings <- data %>%
-  select(ID, familyID, withinID, pgiID,                 # IDs
-         any_of(ASCRIBED),                              # demographics 
-         any_of(OUTCOMES_full),                         # outcomes
-         any_of(PGI_COG),                               # PGIs cog
-         any_of(PGI_NON_COG),                           # PGIs noncog
-         all_of(PC_COG),                                # principal components
-         any_of(OBSERVED_COG), any_of(OBSERVED_NON_COG), # observed abilities
-  )
-
-# Label NAs rightly
-siblings <- siblings %>%
-  mutate(across(everything(), ~ ifelse(is.nan(.), NA, .)))  # Applies to all columns
-
-# There are a few cases that are not labelled properly and show 3 or 4 siblings, delete them
-siblings <- siblings[!(siblings$withinID %in% c(3, 4)), ]
-
-# check variables' types
-str(siblings)
-
-# re-code IDs and sex to avoid scaling them
-siblings <- siblings %>% 
-  mutate(familyID = as.character(familyID),
-         withinID = as.character(withinID),
-         sex      = as.factor(as.character(sex)))
-
-# keep a copy before imputation
-siblings_full <- siblings 
 
 
 
 
 
 
-########################## MULTIPLE IMPUTATION  ##########################
-
-# check number of missings in each variable
-missing_percentage <- function(df) {
-  missing_df <- data.frame(Variable = names(df),
-                           Percent_Missing = colMeans(is.na(df)) * 100
-                           )
-  missing_df <- missing_df[order(missing_df$Percent_Missing, decreasing = TRUE), ]
-  rownames(missing_df) <- NULL
-  return(missing_df)
-}
-
-missing_percentage(siblings)
 
 
 
 
-if (impute) {
 
-  # Perform multiple imputation
-  imputed_data <- mice(siblings, m = m, maxit = 20, 
-                       method = 'cart', seed = 123, printFlag=T) # When code is ready, use m=25, maxit=20
-  # We use cart because it's better for handling a mix of categorical and continuous variables than pmm
+
+
+
+
+########################## ISOLATE OUTCOMES  ##########################
+
+lapply(OUTCOMES, function(outcome) {
   
-  # View imputed data summary
-  summary(imputed_data)
+  outcome_vars <- switch(outcome,"education"="education",
+                         "income"="income",
+                         "wealth"="wealth",
+                         "health_pc"=c("health_self", "health_illness", "health_hospital"))
   
-  #------ DELETE OUTCOME VALUES IMPUTED (FOLLOWING VON HIPPEL, 2007)
-  # Count NAs for each outcome variable
-  na_counts <- sapply(OUTCOMES_full, function(var) sum(is.na(siblings[[var]])))
-  na_counts
+  # Select each outcome separately
+  siblings <- data %>% 
+    select(ID, familyID, withinID, pgiID,                  # IDs
+            any_of(ASCRIBED),                              # demographics 
+            any_of(outcome_vars),                          # outcomes
+            any_of(PGI_COG),                               # PGIs cog
+            any_of(PGI_NON_COG),                           # PGIs noncog
+            all_of(PC_COG),                                # principal components
+            any_of(OBSERVED_COG), any_of(OBSERVED_NON_COG), # observed abilities
+        )
+
+  # Label NAs rightly
+  siblings <- siblings %>%
+    mutate(across(everything(), ~ ifelse(is.nan(.), NA, .)))  # Applies to all columns
   
-  # Function to replace imputed outcome values with NA
-  replace_imputed_with_na <- function(siblings, imputed_data, OUTCOMES_full) {
-    # Create a copy of the imputed dataset to modify
-    clean_data <- imputed_data
-    # Loop through each outcome variable
-    for (var in OUTCOMES_full) {
-      if (var %in% names(siblings)) {
-        # Find indices where the original data was NA but the imputed data has values
-        imputed_indices <- which(!is.na(clean_data[[var]]) & is.na(siblings[[var]]))
-        # Replace these imputed values with NA in the imputed dataset
-        clean_data[[var]][imputed_indices] <- NA
-      }
-    }
-    
-    return(clean_data)
+  # There are a few cases that are not labelled properly and show 3 or 4 siblings, delete them
+  siblings <- siblings[!(siblings$withinID %in% c(3, 4)), ]
+  
+  # check variables' types
+  str(siblings)
+  
+  # re-code IDs and sex to avoid scaling them
+  siblings <- siblings %>% 
+    mutate(familyID = as.character(familyID),
+           withinID = as.character(withinID),
+           sex      = as.factor(as.character(sex)))
+  
+  # keep a copy before imputation
+  siblings_full <- siblings 
+
+  
+  ########################## MULTIPLE IMPUTATION  ##########################
+  
+  # check number of missings in each variable
+  missing_percentage <- function(df) {
+    missing_df <- data.frame(Variable = names(df),
+                             Percent_Missing = colMeans(is.na(df)) * 100
+                             )
+    missing_df <- missing_df[order(missing_df$Percent_Missing, decreasing = TRUE), ]
+    rownames(missing_df) <- NULL
+    return(missing_df)
   }
   
-  # Extract imputed datasets from the imputed_data object (list of m datasets)
-  imputed_datasets <- complete(imputed_data, action = "all")
+  missing_percentage(siblings)
   
-  # Apply the function to each dataset in the imputed_datasets list
-  imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
-    replace_imputed_with_na(siblings, imputed_dataset, OUTCOMES_full)
-  }, mc.cores = 4)
   
-  # Check that in the imputed_datasets_without_y there are outcomes with NAs
-  #first_imputed_dataset <- imputed_datasets_without_y[[1]]
+
+  if (impute) {
   
-  # If we want to select only complete observations without implementing multiple imputation:
-  #siblings <- siblings[complete.cases(siblings),] 
-  #n_distinct(siblings$ID)       # 5107
-  #n_distinct(siblings$familyID) # 4319
+    # Perform multiple imputation
+    imputed_data <- mice(siblings, m = m, maxit = 20, 
+                         method = 'cart', seed = 123, printFlag=T) # When code is ready, use m=25, maxit=20
+    # We use cart because it's better for handling a mix of categorical and continuous variables than pmm
+    
+    # View imputed data summary
+    summary(imputed_data)
+    
+    #------ DELETE OUTCOME VALUES IMPUTED (FOLLOWING VON HIPPEL, 2007)
+    # Count NAs for each outcome variable
+    na_counts <- sapply(outcome_vars, function(var) sum(is.na(siblings[[var]])))
+    na_counts
+    
+    # Function to replace imputed outcome values with NA
+    replace_imputed_with_na <- function(siblings, imputed_data, outcome_vars) {
+      # Create a copy of the imputed dataset to modify
+      clean_data <- imputed_data
+      # Loop through each outcome variable
+      for (var in outcome_vars) {
+        if (var %in% names(siblings)) {
+          # Find indices where the original data was NA but the imputed data has values
+          imputed_indices <- which(!is.na(clean_data[[var]]) & is.na(siblings[[var]]))
+          # Replace these imputed values with NA in the imputed dataset
+          clean_data[[var]][imputed_indices] <- NA
+        }
+      }
+      
+      return(clean_data)
+    }
+    
+    # Extract imputed datasets from the imputed_data object (list of m datasets)
+    imputed_datasets <- complete(imputed_data, action = "all")
+    
+    # Apply the function to each dataset in the imputed_datasets list
+    imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
+      replace_imputed_with_na(siblings, imputed_dataset, outcome)
+    }, mc.cores = 4)
+    
+    # Check that in the imputed_datasets_without_y there are outcomes with NAs
+    #first_imputed_dataset <- imputed_datasets_without_y[[1]]
+    
+    # If we want to select only complete observations without implementing multiple imputation:
+    #siblings <- siblings[complete.cases(siblings),] 
+    #n_distinct(siblings$ID)       # 5107
+    #n_distinct(siblings$familyID) # 4319
+    
+    print("finished imputation.")
+  }
   
-  print("finished imputation.")
-}
+  
+  
+  # select imputed or original data before next steps
+  data_list <- if (impute) imputed_datasets_without_y else list(siblings_full)
+  
+  
+  
+  ########################## REMOVE THOSE WITH UNREALISTIC PARENTAL AGES  ##########################
+  
+  # Remove those with unrealistic parental ages
+  data_list <- lapply(data_list, function(dataset) {
+    dataset %>%
+      filter(mother_age_birth >= 14 & father_age_birth >= 14)
+  })
+  
+  #Check
+  first_imputed_dataset <- data_list[[1]]
+  summary(first_imputed_dataset$father_age_birth) # works
+  
+    
+  
+  if(outcome == "health_pc") {
+  ########################## PRINCIPAL COMPONENTS FOR HEALTH  ##########################
+    
+    # Apply PCA to each filtered dataset
+    data_list <- lapply(data_list, function(dataset) {
+      
+      # Identify rows with complete information for all the other variables
+      health_vars <- c("health_self", "health_illness", "health_hospital")
+      other_vars  <- colnames(dataset)[colnames(dataset) %!in% health_vars]
+      final_analysis_rows <- complete.cases(dataset[, other_vars])
+      
+      # Extract relevant health variables (you can adjust this list of variables if needed)
+      pcdata <- dataset[final_analysis_rows, c("ID",health_vars)]
+      
+      # Estimate the number of components to retain
+      nb_comp <- estim_ncpPCA(pcdata %>% select(-ID)) 
+      
+      # Perform PCA with missing data imputation
+      pca_result <- imputePCA(pcdata %>% select(-ID), ncp = nb_comp$ncp)
+      
+      # Create a new variable for the first principal component and center it
+      pcdata <- pcdata %>%
+        mutate(
+          health_pc = pca_result$completeObs[, 1]  # First PC (PC1)
+        ) %>%
+        mutate(health_pc = health_pc - mean(health_pc))  # Center the first PC
+      
+      # Select only the ID and health_pc columns
+      pcdata <- pcdata %>%
+        select(ID, health_pc)
+      
+      # Remove missings from other variables
+      dataset <- dataset[final_analysis_rows, ]
+      
+      # Merge the PCA results back to the original dataset
+      dataset <- merge(dataset, pcdata, by = "ID", all.x = TRUE)
+      
+      # Remove health variables
+      dataset <- dataset %>% select(-all_of(health_vars))
+      
+      return(dataset)
+    })
+    
+  }
+ 
+  # Double check that NAs are removed
+  data_list <- lapply(data_list, na.omit)
+  
+  
+  ########################## KEEP ONLY TWO-SIBLINGS FAMILIES  ##########################
+  
+  # Apply the filtering process to each dataset in the data_list list
+  data_list <- lapply(data_list, function(dataset) {
+    dataset  %>% 
+      group_by(familyID) %>%
+      filter(n() >= 2) %>%
+      ungroup()
+  })
+  
+  
+  # Count the number of siblings in each family for all datasets in data_list
+  n_siblings_list <- lapply(data_list, function(dataset) {
+    n_siblings <- dataset %>% 
+      group_by(familyID) %>% 
+      summarise(count = n_distinct(ID)) %>%
+      ungroup()
+    
+    return(n_siblings)
+  })
+  
+  # Check
+  n_siblings_first_dataset <- n_siblings_list[[1]]
+  summary(n_siblings_first_dataset$count) # only 2
+  
+  
+  ########################## SAVE ALL THE IMPUTED DATSETS  ##########################
+  
+  # Check number of observations
+  first_dataset <- data_list[[1]]
+  nrow(first_dataset) # only 2
+  
+  # Saving settings
+  if (impute) {
+   # All imputed datasets
+   datafile <- data_list      # save whole list
+   dataname <- "final_datasets"
+  } else {
+   # Single original dataset
+   datalist <- data_list[1]   # access first list level
+   datafile <- datalist[[1]]  # access second list level
+   dataname <- "siblings"
+  }
+  
+  
+  print("your data is ready!")
+  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,".rds"))
 
-
-
-# select imputed or original data before next steps
-data_list <- if (impute) imputed_datasets_without_y else list(siblings_full)
-
-
-
-########################## REMOVE THOSE WITH UNREALISTIC PARENTAL AGES  ##########################
-# Remove those with unrealistic parental ages
-filtered_datasets <- lapply(data_list, function(dataset) {
-  dataset %>%
-    filter(mother_age_birth >= 14 & father_age_birth >= 14)
 })
-
-#Check
-first_imputed_dataset <- filtered_datasets[[1]]
-summary(first_imputed_dataset$father_age_birth) # works
-
-
-########################## PRINCIPAL COMPONENTS FOR HEALTH  ##########################
-
-# Apply PCA to each filtered dataset
-final_datasets <- lapply(filtered_datasets, function(dataset) {
-  
-  # Identify rows with complete information for all the other variables
-  health_vars <- c("health_self", "health_illness", "health_hospital")
-  other_vars  <- colnames(dataset)[colnames(dataset) %!in% health_vars]
-  final_analysis_rows <- complete.cases(dataset[, other_vars])
-  
-  # Extract relevant health variables (you can adjust this list of variables if needed)
-  pcdata <- dataset[final_analysis_rows, c("ID",health_vars)]
-  
-  # Estimate the number of components to retain
-  nb_comp <- estim_ncpPCA(pcdata %>% select(-ID)) 
-  
-  # Perform PCA with missing data imputation
-  pca_result <- imputePCA(pcdata %>% select(-ID), ncp = nb_comp$ncp)
-  
-  # Create a new variable for the first principal component and center it
-  pcdata <- pcdata %>%
-    mutate(
-      health_pc = pca_result$completeObs[, 1]  # First PC (PC1)
-    ) %>%
-    mutate(health_pc = health_pc - mean(health_pc))  # Center the first PC
-  
-  # Select only the ID and health_pc columns
-  pcdata <- pcdata %>%
-    select(ID, health_pc)
-  
-  # Remove missings from other variables
-  dataset <- dataset[final_analysis_rows, ]
-  
-  # Merge the PCA results back to the original dataset
-  dataset <- merge(dataset, pcdata, by = "ID", all.x = TRUE)
-  
-  # Remove health variables
-  dataset <- dataset %>% select(-all_of(health_vars))
-  
-  return(dataset)
-})
-
-
-########################## KEEP ONLY TWO-SIBLINGS FAMILIES  ##########################
-
-# Apply the filtering process to each dataset in the datasets_without_imputed_y list
-final_datasets <- lapply(final_datasets, function(dataset) {
-  dataset  %>% 
-    group_by(familyID) %>%
-    filter(n() >= 2) %>%
-    ungroup()
-})
-
-# Count the number of siblings in each family for all datasets in final_datasets
-n_siblings_list <- lapply(final_datasets, function(dataset) {
-  n_siblings <- dataset %>% 
-    group_by(familyID) %>% 
-    summarise(count = n_distinct(ID)) %>%
-    ungroup()
-  
-  return(n_siblings)
-})
-
-# Check
-n_siblings_first_dataset <- n_siblings_list[[1]]
-summary(n_siblings_first_dataset$count) # only 2
-
-
-########################## SAVE ALL THE IMPUTED DATSETS  ##########################
-if (impute) {
-  datafile <- final_datasets
-  dataname <- "final_datasets"
-} else {
-  datalist <- final_datasets[1]
-  datafile <- datalist[[1]]
-  dataname <- "siblings"
-}
-
-
-print("your data is ready!")
-saveRDS(datafile, file = paste0("data/",dataname,".rds"))
-
-
-n_distinct(siblings$familyID)
-
 
 
 
