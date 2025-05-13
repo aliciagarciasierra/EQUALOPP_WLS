@@ -67,7 +67,7 @@ suppressPackageStartupMessages({
 
 ########################## GLOBALS ####################################
 
-INDICES <- c("Sibcorr","IOLIB", "IORAD")
+INDICES      <- c("Sibcorr", "IOLIB", "IORAD")
 INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "IORAD" = "Radical IOP")
 
 # Outcomes
@@ -76,6 +76,7 @@ OUTCOMES      <- c("education", "income", "wealth", "health_pc")
 # All outcomes:
 OUTCOMES_full <- c("education", "income", "wealth", "health_self", "health_illness", "health_hospital", "health_pc")
 OUTCOMES.labs <- c("education"       = "Education", 
+                   "grades"          = "School grades",
                    "occupation"      = "Occupation", 
                    "income"          = "Income Ind.",
                    "wealth"          = "Wealth", 
@@ -88,7 +89,7 @@ OUTCOMES.labs <- c("education"       = "Education",
 ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "father_age_birth", "birth_order")
 
 # Natural talents
-NT      = c("PGIs", "observed")
+NT      = c("PGI", "observed")
 nt.labs = c("PGI"     = "PGIs", 
             "observed"= "observed abilities")
 
