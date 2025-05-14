@@ -88,6 +88,7 @@ OUTCOMES.labs <- c("education"       = "Education",
 # Ascribed characteristics
 ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "father_age_birth", "birth_order")
 
+
 # Natural talents
 NT      = c("PGI", "observed")
 nt.labs = c("PGI"     = "PGIs", 

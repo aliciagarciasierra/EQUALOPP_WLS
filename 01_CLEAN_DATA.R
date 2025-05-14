@@ -13,9 +13,10 @@ script <- F
 
 
 # If script == F, specify manually the arguments:
-impute     <- F
-m          <- 25
-age_filter <- F
+impute         <- F
+m              <- 25
+age_filter     <- T
+outlier_filter <- F
 
 
 # If script == T, the arguments are overwritten:
@@ -151,7 +152,19 @@ select(data, contains("age_w")) %>% summary()
 
 
 
-##########  Age filter ##########  
+
+
+########################## PERCENTILE INCOME RANK ######################################
+
+select(data, contains("income_")) %>% summary()
+
+data <- data %>%
+  mutate(across(matches("income_"), ~ percent_rank(.) * 100))
+
+select(data, contains("income_")) %>% summary()
+
+
+########################## AGE FILTER ######################################
 
 if (age_filter) {
   min_income = 45
@@ -221,8 +234,6 @@ if (age_filter) {
 }
 
 summary(select(data, any_of(OUTCOMES_full)))
-
-
 
 
 ########################## PGIs cognitive ######################################
@@ -512,6 +523,35 @@ data_list <- lapply(data_list, function(dataset) {
 data_list <- lapply(data_list, na.omit)
 
 
+
+
+
+########################## REMOVE OUTLIERS ##########################
+
+
+
+if (outlier_filter) {
+  
+  data_list <- lapply(data_list, function(dataset) {
+    
+    # Wealth
+    OutVals = boxplot(dataset$wealth)$out
+    out_wealth <- which(dataset$wealth %in% OutVals)
+    
+    # Income
+    OutVals = boxplot(dataset$income)$out
+    out_income <- which(dataset$income %in% OutVals)
+    
+    dataset %>% filter(row_number() %!in% c(out_wealth, out_income))
+    
+  })
+
+}
+
+
+
+
+
 ########################## KEEP ONLY TWO-SIBLINGS FAMILIES  ##########################
 
 # Apply the filtering process to each dataset in the data_list list
@@ -538,6 +578,10 @@ n_siblings_first_dataset <- n_siblings_list[[1]]
 summary(n_siblings_first_dataset$count) # only 2
 
 
+
+
+
+
 ########################## SAVE ALL THE IMPUTED DATSETS  ##########################
 
 # Check number of observations
@@ -557,11 +601,20 @@ if (impute) {
 }
 
 
+
+
 print("your data is ready!")
 
 lapply(outcome_vars, function(outcome) {
   saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,".rds"))
 })
+
+
+
+
+
+
+
 
 
 
