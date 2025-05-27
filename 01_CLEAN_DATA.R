@@ -6,34 +6,25 @@
 
 source("00_MASTER.R")
 
-# SETTINGS   ------------------
-# Set to F if you want to run the code from Rstudio
-script <- F
 
+########################## SETUP ####################################
 
+# Outcomes to include in the data:
+outcome_vars   <- OUTCOMES    # OUTCOMES is defined in 00_MASTER.R
 
-# If script == F, specify manually the arguments:
+# If health pc is needed, add the variables to build it.
+health_vars <- c("health_self", "health_illness", "health_hospital")
+if ("health_pc" %in% outcome_vars) outcome_vars <- c(outcome_vars, health_vars)
+
+# Imputation:
 impute         <- F
-m              <- 25
-age_filter     <- T
+m              <- 2
+maxit          <- 2
+
+# Filters:
+age_filter     <- F
 outlier_filter <- F
 
-
-# If script == T, the arguments are overwritten:
-if (script) {
-  args = commandArgs(trailingOnly=TRUE)
-  args <- strsplit(args, ",")
-  
-  if (length(args) == 0) {
-    args[[1]] <- F
-    args[[2]] <- m
-  } else if (length(args) == 1) {
-    args[[2]] <- m
-  }
-  
-  impute <- args[[1]] %>% as.logical()
-  m      <- args[[2]] %>% as.numeric()
-} 
 
 
 # FAST READ FROM RDS  ------------------
@@ -156,12 +147,12 @@ select(data, contains("age_w")) %>% summary()
 
 ########################## PERCENTILE INCOME RANK ######################################
 
-select(data, contains("income_")) %>% summary()
-
-data <- data %>%
-  mutate(across(matches("income_"), ~ percent_rank(.) * 100))
-
-select(data, contains("income_")) %>% summary()
+#select(data, contains("income_")) %>% summary()
+#
+#data <- data %>%
+#  mutate(across(matches("income_"), ~ percent_rank(.) * 100))
+#
+#select(data, contains("income_")) %>% summary()
 
 
 ########################## AGE FILTER ######################################
@@ -353,14 +344,12 @@ summary(select(data, any_of(OBSERVED_NON_COG)))
 
 ########################## SELECT SAMPLE ##########################
 
-outcome_vars <- OUTCOMES_full
-
 
 # Select each outcome separately
 siblings <- data %>% 
   select(ID, familyID, withinID, pgiID,                  # IDs
           any_of(ASCRIBED),                              # demographics 
-          any_of(outcome_vars),                         # outcomes
+          any_of(outcome_vars),                          # outcomes
           any_of(PGI_COG),                               # PGIs cog
           any_of(PGI_NON_COG),                           # PGIs noncog
           all_of(PC_COG),                                # principal components
@@ -406,7 +395,7 @@ missing_percentage(siblings)
 if (impute) {
 
   # Perform multiple imputation
-  imputed_data <- mice(siblings, m = m, maxit = 20, 
+  imputed_data <- mice(siblings, m = m, maxit = maxit, 
                        method = 'cart', seed = 123, printFlag=T) # When code is ready, use m=25, maxit=20
   # We use cart because it's better for handling a mix of categorical and continuous variables than pmm
   
@@ -440,7 +429,7 @@ if (impute) {
   
   # Apply the function to each dataset in the imputed_datasets list
   imputed_datasets_without_y <- mclapply(imputed_datasets, function(imputed_dataset) {
-    replace_imputed_with_na(siblings, imputed_dataset, outcome)
+    replace_imputed_with_na(siblings, imputed_dataset, outcome_vars)
   }, mc.cores = 4)
   
   # Check that in the imputed_datasets_without_y there are outcomes with NAs
@@ -477,47 +466,52 @@ summary(first_imputed_dataset$father_age_birth) # works
 
 ########################## PRINCIPAL COMPONENTS FOR HEALTH  ##########################
   
-# Apply PCA to each filtered dataset
-data_list <- lapply(data_list, function(dataset) {
-  
-  # Identify rows with complete information for all the other variables
-  health_vars <- c("health_self", "health_illness", "health_hospital")
-  other_vars  <- colnames(dataset)[colnames(dataset) %!in% health_vars]
-  final_analysis_rows <- complete.cases(dataset[, other_vars])
-  
-  # Extract relevant health variables (you can adjust this list of variables if needed)
-  pcdata <- dataset[final_analysis_rows, c("ID",health_vars)]
-  
-  # Estimate the number of components to retain
-  nb_comp <- estim_ncpPCA(pcdata %>% select(-ID)) 
-  
-  # Perform PCA with missing data imputation
-  pca_result <- imputePCA(pcdata %>% select(-ID), ncp = nb_comp$ncp)
-  
-  # Create a new variable for the first principal component and center it
-  pcdata <- pcdata %>%
-    mutate(
-      health_pc = pca_result$completeObs[, 1]  # First PC (PC1)
-    ) %>%
-    mutate(health_pc = health_pc - mean(health_pc))  # Center the first PC
-  
-  # Select only the ID and health_pc columns
-  pcdata <- pcdata %>%
-    select(ID, health_pc)
-  
-  # Remove missings from other variables
-  dataset <- dataset[final_analysis_rows, ]
-  
-  # Merge the PCA results back to the original dataset
-  dataset <- merge(dataset, pcdata, by = "ID", all.x = TRUE)
-  
-  # Remove health variables
-  dataset <- dataset %>% select(-all_of(health_vars))
-  
-  return(dataset)
-})
-  
 
+
+if (any(health_vars %in% colnames(data_list[[1]]))) {
+    
+  # Apply PCA to each filtered dataset
+  data_list <- lapply(data_list, function(dataset) {
+    
+    # Identify rows with complete information for all the other variables
+    
+    other_vars  <- colnames(dataset)[colnames(dataset) %!in% health_vars]
+    final_analysis_rows <- complete.cases(dataset[, other_vars])
+    
+    # Extract relevant health variables (you can adjust this list of variables if needed)
+    pcdata <- dataset[final_analysis_rows, c("ID",health_vars)]
+    
+    # Estimate the number of components to retain
+    nb_comp <- estim_ncpPCA(pcdata %>% select(-ID)) 
+    
+    # Perform PCA with missing data imputation
+    pca_result <- imputePCA(pcdata %>% select(-ID), ncp = nb_comp$ncp)
+    
+    # Create a new variable for the first principal component and center it
+    pcdata <- pcdata %>%
+      mutate(
+        health_pc = pca_result$completeObs[, 1]  # First PC (PC1)
+      ) %>%
+      mutate(health_pc = health_pc - mean(health_pc))  # Center the first PC
+    
+    # Select only the ID and health_pc columns
+    pcdata <- pcdata %>%
+      select(ID, health_pc)
+    
+    # Remove missings from other variables
+    dataset <- dataset[final_analysis_rows, ]
+    
+    # Merge the PCA results back to the original dataset
+    dataset <- merge(dataset, pcdata, by = "ID", all.x = TRUE)
+    
+    # Remove health variables
+    dataset <- dataset %>% select(-all_of(health_vars))
+    
+    return(dataset)
+  })
+    
+
+}
 
 # Double check that NAs are removed
 data_list <- lapply(data_list, na.omit)

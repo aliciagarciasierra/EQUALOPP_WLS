@@ -35,7 +35,7 @@ suppressPackageStartupMessages({
   library(Matrix) # note that an updated version of R might be required for this package to work correctly in our analyses
   library(openxlsx)
   library(ggplot2)
-  library(pilot)
+  #library(pilot)
   library(ggpubr)
   library(missMDA)
   library(parallel)
@@ -72,7 +72,8 @@ INDICES.labs <- c("Sibcorr" = "Sibling correlation", "IOLIB" = "Liberal IOP", "I
 
 # Outcomes
 # Used for the analysis:
-OUTCOMES      <- c("education", "income", "wealth", "health_pc")
+OUTCOMES      <- c("education")    # "income", "wealth", "health_pc"
+
 # All outcomes:
 OUTCOMES_full <- c("education", "income", "wealth", "health_self", "health_illness", "health_hospital", "health_pc")
 OUTCOMES.labs <- c("education"       = "Education", 
@@ -122,9 +123,22 @@ noncog_vars  <- paste(OBSERVED_NON_COG, collapse=" + ")
 ########################## FUNCTIONS ####################################
 
 #-------------- Function to compute the main indexes 
-compute_indexes <- function(outcome, data, m0_vars, m1_vars, m2_vars) {
+compute_indexes <- function(outcome, data, natural_talents) {
   
+  # ------- models specifications
+  m0_vars <- "1"
   famID   <- "+ (1 | familyID)"
+  
+  if(natural_talents == "PGI") {
+    m1_vars <- paste0("(", pgi_vars, ")^2")
+    m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
+    
+  } else if(natural_talents == "observed") {
+    m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
+    m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
+  }
+  
+  
   
   # 1) NULL MODEL
   m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data)
@@ -181,9 +195,20 @@ compute_indexes <- function(outcome, data, m0_vars, m1_vars, m2_vars) {
 
 
 #-------------- Function to be bootstrapped
-est_fun <- function(data, indices, outcome) {
+est_fun <- function(data, indices, outcome, natural_talents) {
   
+  # ------- models specifications
+  m0_vars <- "1"
   famID   <- "+ (1 | familyID)"
+  
+  if(natural_talents == "PGI") {
+    m1_vars <- paste0("(", pgi_vars, ")^2")
+    m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
+    
+  } else if(natural_talents == "observed") {
+    m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
+    m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
+  }
   
   # Subset the data for this bootstrap sample
   data_sample <- data[indices, ]

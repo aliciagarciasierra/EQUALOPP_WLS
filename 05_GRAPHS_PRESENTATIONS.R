@@ -6,6 +6,15 @@
 rm(list = ls())
 source("00_MASTER.R")
 
+
+########################## SETUP ####################################
+
+# Set which outcomes to plot
+outcomes <- OUTCOMES
+
+# Which data to read
+impute <- F
+
 # Ensure the patchwork package is installed and loaded
 if (!requireNamespace("patchwork", quietly = TRUE)) {
   install.packages("patchwork")
@@ -14,18 +23,13 @@ library(patchwork)
 
 
 
-# Set which outcomes to plot
-outcomes <- OUTCOMES
+########################## SAVE ALL PLOTS ####################################
 
-
-
-# save all plots in png --------------------
 lapply(outcomes, function(outcome) {
     
   lapply(c(T,F), function(impute) {
     
     # lab
-    impute <- F
     impute_lab <- ifelse(impute,"_MI","")
     
     # Open graphs
@@ -52,11 +56,12 @@ lapply(outcomes, function(outcome) {
 
 
 
-# print single plot --------------------
 
-# set preferred outcome and data (imputed?)
+
+########################## SHOW SINGLE OUTCOME ####################################
+
+# Set preferred outcome and data
 outcome <-"education" 
-impute  <-T
 
 # lab
 impute_lab <- ifelse(impute,"_MI","")
