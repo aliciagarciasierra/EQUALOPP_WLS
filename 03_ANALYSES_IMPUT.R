@@ -22,27 +22,6 @@ m <- 2
 
 
 
-########################## MODELS ESTIMATION ####################################
-
-# ------- read data
-data_list <-readRDS("data/final_datasets.rds")
-
-# check sample size and families
-data_example <- data_list[[1]]
-n_distinct(data_example$ID)
-n_distinct(data_example$familyID)
-
-
-# ------- scale numeric variables
-data_list <- lapply(data_list, function(df) {
-  df %>% mutate_if(is.numeric, scale)
-})
-
-# ------- subset all data for testing (change m for less imputed datasets)
-data_list <- data_list[1:m]
-
-
-
 
 
 # Run for both PGIs and observed abilities:
@@ -55,6 +34,27 @@ for (natural_talents in NT) {
       print(paste0("which talent: ",natural_talents))
       print(paste0("n bootstraps: ",n_boot))
       print(paste0("m: ",m))
+      
+      
+      
+      ########################## MODELS ESTIMATION ####################################
+      
+      # ------- read data
+      data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
+      
+      # check sample size and families
+      data_example <- data_list[[1]]
+      n_distinct(data_example$ID)
+      n_distinct(data_example$familyID)
+      
+      # ------- scale numeric variables
+      data_list <- lapply(data_list, function(df) {
+        df %>% mutate_if(is.numeric, scale)
+      })
+      
+      # ------- subset all data for testing (change m for less imputed datasets)
+      data_list <- data_list[1:m]
+      
       
       
       ######################## POINT VALUES ##############################

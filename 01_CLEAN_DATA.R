@@ -8,14 +8,14 @@ source("00_MASTER.R")
 ########################## SETUP ####################################
 
 # Outcomes to include in the data:
-outcome_vars   <- OUTCOMES    # OUTCOMES is defined in 00_MASTER.R
+outcome_vars   <- "education"    # OUTCOMES is defined in 00_MASTER.R
 
 # If health pc is needed, add the variables to build it.
 health_vars <- c("health_self", "health_illness", "health_hospital")
 if ("health_pc" %in% outcome_vars) outcome_vars <- c(outcome_vars, health_vars)
 
 # Imputation:
-impute         <- F
+impute         <- T
 m              <- 2
 maxit          <- 2
 
@@ -594,9 +594,10 @@ if (impute) {
 
 
 print("your data is ready!")
+impute_lab <- ifelse(impute, "_MI","")
 
 lapply(outcome_vars, function(outcome) {
-  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,".rds"))
+  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,impute_lab,".rds"))
 })
 
 
