@@ -40,7 +40,7 @@ for (natural_talents in NT) {
       ########################## MODELS ESTIMATION ####################################
       
       # ------- read data
-      data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
+      data_list <-readRDS(paste0("data/final_datasets_",outcome,".rds"))
       
       # check sample size and families
       data_example <- data_list[[1]]

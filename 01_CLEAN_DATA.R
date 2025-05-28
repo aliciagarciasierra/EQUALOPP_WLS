@@ -594,10 +594,9 @@ if (impute) {
 
 
 print("your data is ready!")
-impute_lab <- ifelse(impute, "_MI","")
 
 lapply(outcome_vars, function(outcome) {
-  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,impute_lab,".rds"))
+  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,".rds"))
 })
 
 

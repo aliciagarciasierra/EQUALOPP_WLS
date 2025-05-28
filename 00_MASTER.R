@@ -109,11 +109,7 @@ PC_COG      <- paste0("pc", 1:10, "cog")
 # multiple imputation
 m      <- 25
 
-# for formulas
-ascr_vars    <- paste(ASCRIBED,         collapse=" + ")
-pgi_vars     <- paste(PGIs,             collapse=" + ")
-cog_vars     <- paste(OBSERVED_COG,     collapse=" + ")
-noncog_vars  <- paste(OBSERVED_NON_COG, collapse=" + ")
+
 
 
 
@@ -129,6 +125,13 @@ compute_indexes <- function(outcome, data, natural_talents) {
   m0_vars <- "1"
   famID   <- "+ (1 | familyID)"
   
+  # Combine available variables with a + 
+  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% colnames(data)],                 collapse=" + ")
+  pgi_vars     <- paste(PGIs[PGIs %in% colnames(data)],                         collapse=" + ")
+  cog_vars     <- paste(OBSERVED_COG[OBSERVED_COG %in% colnames(data)],         collapse=" + ")
+  noncog_vars  <- paste(OBSERVED_NON_COG[OBSERVED_NON_COG %in% colnames(data)], collapse=" + ")
+  
+  # Combine variable sets together
   if(natural_talents == "PGI") {
     m1_vars <- paste0("(", pgi_vars, ")^2")
     m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
@@ -137,7 +140,6 @@ compute_indexes <- function(outcome, data, natural_talents) {
     m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
     m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
   }
-  
   
   
   # 1) NULL MODEL
@@ -201,6 +203,13 @@ est_fun <- function(data, indices, outcome, natural_talents) {
   m0_vars <- "1"
   famID   <- "+ (1 | familyID)"
   
+  # Combine available variables with a + 
+  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% colnames(data)],                 collapse=" + ")
+  pgi_vars     <- paste(PGIs[PGIs %in% colnames(data)],                         collapse=" + ")
+  cog_vars     <- paste(OBSERVED_COG[OBSERVED_COG %in% colnames(data)],         collapse=" + ")
+  noncog_vars  <- paste(OBSERVED_NON_COG[OBSERVED_NON_COG %in% colnames(data)], collapse=" + ")
+  
+  # Combine variable sets together
   if(natural_talents == "PGI") {
     m1_vars <- paste0("(", pgi_vars, ")^2")
     m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
