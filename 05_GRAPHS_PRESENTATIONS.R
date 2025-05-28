@@ -7,6 +7,14 @@ rm(list = ls())
 source("00_MASTER.R")
 
 
+########################## SETUP ####################################
+
+# Set which outcomes to plot
+outcomes <- OUTCOMES
+
+# Which data to read
+impute <- F
+
 # Ensure the patchwork package is installed and loaded
 if (!requireNamespace("patchwork", quietly = TRUE)) {
   install.packages("patchwork")
@@ -15,21 +23,21 @@ library(patchwork)
 
 
 
-# save all plots in png --------------------
-lapply(c(T,F), function(impute) {
-  
-  # lab
-  impute_lab <- ifelse(impute,"_MI","")
-  
-  # Open lists with graphs
-  plots_list_pgi <- readRDS(paste0("plots/by_outcome/plots_list_PGI",impute_lab,".rds"))
-  plots_list_obs <- readRDS(paste0("plots/by_outcome/plots_list_observed",impute_lab,".rds"))
-  
-  lapply(OUTCOMES, function(outcome) {
+########################## SAVE ALL PLOTS ####################################
+
+lapply(outcomes, function(outcome) {
     
+  lapply(c(T,F), function(impute) {
+    
+    # lab
+    impute_lab <- ifelse(impute,"_MI","")
+    
+    # Open graphs
+    plot_pgi <- readRDS(paste0("plots/by_outcome/",outcome,"_PGI",impute_lab,".rds"))
+    plot_obs <- readRDS(paste0("plots/by_outcome/",outcome,"_observed",impute_lab,".rds"))
+  
     # combine plots
-    plots_list_pgi[[outcome]] + 
-      plots_list_obs[[outcome]] +
+    plot_pgi + plot_obs +
       plot_layout(guides = "collect") &  # Note the & instead of +
       theme(
         legend.text=element_text(size=15),
@@ -41,18 +49,19 @@ lapply(c(T,F), function(impute) {
     
     # save
     ggsave(paste0("plots/by_outcome/",outcome,impute_lab,".pdf"), width = 13, height = 6, dpi = 300)
-    
+  
   })
 })
 
 
 
 
-# print single plot --------------------
 
-# set preferred outcome and data (imputed?)
+
+########################## SHOW SINGLE OUTCOME ####################################
+
+# Set preferred outcome and data
 outcome <-"education" 
-impute  <-T
 
 # lab
 impute_lab <- ifelse(impute,"_MI","")
