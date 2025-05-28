@@ -4,7 +4,10 @@ In this way you can keep the data in the repository remotely, without publishing
 
 
 ## other points:
-- regarding the iterations, I'm using m=20, maxit= 5 and n_boot=1000. I haven't updated the code to preserve the current state, but just so you know :)
+- regarding the iterations, I'm using m=20, maxit= 5 and n_boot=1000. I haven't updated the code to preserve the current state, but just so you know
+
+## things to discuss:
+- with imputation there's some varying in the final number of observations of each dataset (small variations, of 2 or 4 observations)
 
 ## new points:
 - 01_CLEAN_DATA.R now creates a separate rds file for each outcome (all given the same sample), which can then be read and combined. 
