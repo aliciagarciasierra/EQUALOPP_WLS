@@ -3,6 +3,10 @@ The .gitignore file indicates which files should be ignored for the commits, mea
 In this way you can keep the data in the repository remotely, without publishing it on github :) 
 
 ## new points:
-- 02_ANALYSES_WLS.R now performs the analysis for both PGIs and observed abilities, you just have to set the value you want at the beginning of the script
-- Scripts 01, 02, and 03 can be run both from terminal and from Rstudio, by setting the argument 'script' (T or F). If F,  other arguments should be set.
+- 01_CLEAN_DATA.R now creates a separate rds file for each outcome (all given the same sample), which can then be read and combined. 
+  Multiple imputation, age filtering, and outlier removal can all be applied by changing the arguments at the top of the script.
+- 01_CLEAN_DATA_single_outcomes.R creates a separate rds file for each outcome, each with the maximum available sample for that outcome (this can be removed at some point if not used).
+- 02_ANALYSES_MAIN.R and 02_ANALYSES_IMPUT.R produce results for both PGIs and observed abilities, for the desired outcomes (to specify at the top).
+  The scripts also produce a graph with all the outcomes together (if multiple are given), and the separate plots for each outcome, to be read and 
+  combined in 05_GRAPHS_PRESENTATIONS.R 
 
