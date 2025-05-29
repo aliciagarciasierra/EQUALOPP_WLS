@@ -8,7 +8,7 @@ source("00_MASTER.R")
 ########################## SETUP ####################################
 
 # Outcomes to include in the data:
-outcome_vars   <- "education"    # OUTCOMES is defined in 00_MASTER.R
+outcome_vars   <- OUTCOMES    # OUTCOMES is defined in 00_MASTER.R
 
 # If health pc is needed, add the variables to build it.
 health_vars <- c("health_self", "health_illness", "health_hospital")
@@ -16,8 +16,8 @@ if ("health_pc" %in% outcome_vars) outcome_vars <- c(outcome_vars, health_vars)
 
 # Imputation:
 impute         <- T
-m              <- 2
-maxit          <- 2
+m              <- 20
+maxit          <- 25
 
 # Filters:
 age_filter     <- F
@@ -596,8 +596,23 @@ if (impute) {
 print("your data is ready!")
 
 lapply(outcome_vars, function(outcome) {
-  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,".rds"))
+  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,"_MI.rds"))
 })
 
+########################### NUMBER OF OBSERVATIONS ############################
+
+# Get the number of observations in each dataset
+n_obs_per_dataset <- sapply(data_list, nrow)
+
+# View the result
+n_obs_per_dataset
+
+
+# Get the number of unique families per dataset
+n_families_per_dataset <- sapply(data_list, function(dataset) {
+  length(unique(dataset$familyID))
+})
+
+n_families_per_dataset
 
 

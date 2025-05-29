@@ -14,7 +14,7 @@ source("00_MASTER.R")
 outcomes <- OUTCOMES   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 100
+n_boot <- 2
 
 # Number of imputed datasets:
 m <- 2
@@ -30,11 +30,11 @@ sapply(outcomes, function(outcome) {
   paste(outcome)
   
   # read all
-  data_list <-readRDS(paste0("data/final_datasets_",outcome,".rds"))
+  data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
   
   lapply(c(0,1), function(which_sex) {
     # Set label
-    sex_lab <- ifelse(which_sex==0,"sons","daughters")
+    sex_lab <- ifelse(which_sex==0,"Sons","Daughters")
     # filter by gender
     df <- data_list[[1]] %>%
       group_by(familyID) %>%
@@ -61,7 +61,7 @@ for (natural_talents in NT) {
     for (which_sex in c(0,1)) {
       
       # ------- set label
-      sex_lab <- ifelse(which_sex==0,"sons","daughters")
+      sex_lab <- ifelse(which_sex==0,"Sons","Daughters")
       
       # ------- check
       print(paste0("which group: ",  sex_lab))
@@ -226,7 +226,7 @@ for (natural_talents in NT) {
 # Read data
 all_ci_summary <- lapply(c(0,1), function(which_sex) {
   # Save sex label
-  sex_lab <- ifelse(which_sex==0,"sons","daughters")
+  sex_lab <- ifelse(which_sex==0,"Sons","Daughters")
   
   # Read by both ability definitions
   all_ci_summary <- lapply(NT, function(natural_talents) {
@@ -245,36 +245,45 @@ ci_summary <- bind_rows(all_ci_summary)
 # Custom order 
 ci_summary$Index   <- factor(ci_summary$Index,   levels = INDICES)
 ci_summary$Outcome <- factor(ci_summary$Outcome, levels = outcomes)
-
-
+ci_summary$ability <- factor(ci_summary$ability, 
+                             levels = c("PGI", "observed"), 
+                             labels = c("PGI", "Observed"))
 # Create the bar graph
 # Main elements
 ggplot(ci_summary, aes(x = Outcome, y = Estimate, fill = Index)) +
   geom_bar(stat = "identity", position = "dodge") +
   geom_errorbar(aes(ymin = Lower, ymax = Upper), 
                 position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
-  facet_grid(ability~sex) +
-  labs(title = " ", x = " ", y = " ") +
-  geom_text(aes(label = round(Estimate, 2)), position = position_dodge(width = 1), vjust =-1.5 ,hjust=-0.1) + 
+  facet_grid(ability ~ sex, labeller = label_wrap_gen()) +
+  geom_text(aes(label = round(Estimate, 2)), 
+            position = position_dodge(width = 1), 
+            vjust = -3, hjust = -0.1) +
   
-  # Add labels
-  scale_fill_discrete(labels = c("Sibcorr" = "Sibling correlation", 
-                                 "IOLIB" = "Liberal IOP", 
-                                 "IORAD" = "Radical IOP")) +
-  # Theme
+  # Labels
+  scale_fill_manual(values = c("Sibcorr" = "#F8766D", 
+                               "IOLIB" = "#00BA38", 
+                               "IORAD" = "#619CFF"),
+                    labels = c("Sibling correlation", "Liberal IOP", "Radical IOP")) +
+  
   guides(fill = guide_legend(title = NULL)) +
-  # Theme adjustments
-  theme_bw(base_size = 15) +  # Set base font size
+  coord_cartesian(clip = "off") +
+  
+  # Theme
+  theme_bw(base_size = 15) +
   theme(
-    axis.title.x = element_text(size = 16, face = "bold"),  # Increase x-axis title size
-    axis.title.y = element_text(size = 16, face = "bold"),  # Increase y-axis title size
-    axis.text.x = element_text(size = 14),  # Increase x-axis text size
-    axis.text.y = element_text(size = 14),  # Increase y-axis text size
-    panel.grid.major = element_blank(),  # Remove major grid lines
-    panel.grid.minor = element_blank(),  # Remove minor grid lines
-    plot.margin = margin(10, 10, 10, 10)  # Add space around the plot
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(" "),
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(),
+    axis.text.y  = element_text(size = 14),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = "goldenrod1", color = "grey30", linewidth = 0.8),  # Updated here
+    strip.text = element_text(size = 14),
+    plot.margin = margin(10, 10, 10, 10),
+    legend.position = "bottom",    
   ) +
-  ylim(c(-0.05,0.7)) +
+  ylim(c(-0.05, 0.7)) +
   ggtitle(OUTCOMES.labs[outcome])
 
 
