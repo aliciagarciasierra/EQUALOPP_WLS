@@ -34,7 +34,7 @@ sapply(outcomes, function(outcome) {
   
   lapply(c(0,1), function(which_sex) {
     # Set label
-    sex_lab <- ifelse(which_sex==0,"Sons","Daughters")
+    sex_lab <- ifelse(which_sex==0,"Brothers","Sisters")
     # filter by gender
     df <- data_list[[1]] %>%
       group_by(familyID) %>%
@@ -61,7 +61,7 @@ for (natural_talents in NT) {
     for (which_sex in c(0,1)) {
       
       # ------- set label
-      sex_lab <- ifelse(which_sex==0,"Sons","Daughters")
+      sex_lab <- ifelse(which_sex==0,"Brothers","Sisters")
       
       # ------- check
       print(paste0("which group: ",  sex_lab))
@@ -226,7 +226,7 @@ for (natural_talents in NT) {
 # Read data
 all_ci_summary <- lapply(c(0,1), function(which_sex) {
   # Save sex label
-  sex_lab <- ifelse(which_sex==0,"Sons","Daughters")
+  sex_lab <- ifelse(which_sex==0,"Brothers","Sisters")
   
   # Read by both ability definitions
   all_ci_summary <- lapply(NT, function(natural_talents) {
