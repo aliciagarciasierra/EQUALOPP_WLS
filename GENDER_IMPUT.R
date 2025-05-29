@@ -14,10 +14,10 @@ source("00_MASTER.R")
 outcomes <- OUTCOMES   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 2
+n_boot <- 1000
 
 # Number of imputed datasets:
-m <- 2
+m <- 20
 
 
 
@@ -254,7 +254,7 @@ ggplot(ci_summary, aes(x = Outcome, y = Estimate, fill = Index)) +
   geom_bar(stat = "identity", position = "dodge") +
   geom_errorbar(aes(ymin = Lower, ymax = Upper), 
                 position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
-  facet_grid(ability ~ sex, labeller = label_wrap_gen()) +
+  facet_grid(sex ~ ability, labeller = label_wrap_gen()) +
   geom_text(aes(label = round(Estimate, 2)), 
             position = position_dodge(width = 1), 
             vjust = -3, hjust = -0.1) +
