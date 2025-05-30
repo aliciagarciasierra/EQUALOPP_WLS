@@ -18,7 +18,7 @@ outcomes <- OUTCOMES   # OUTCOMES is defined in 00_MASTER.R
 n_boot <- 10
 
 # Number of imputed datasets:
-m <- 2
+m <- 10
 
 
 
@@ -204,7 +204,7 @@ for (natural_talents in NT) {
           plot.margin = margin(10, 10, 10, 10),  # Add space around the plot
           legend.position = "none",  # Remove the legend
           plot.title = element_text(hjust = 0.5)) +
-        scale_y_continuous(limits = c(0, 0.5)) 
+        scale_y_continuous(limits = c(0, 0.65)) 
       
       
       

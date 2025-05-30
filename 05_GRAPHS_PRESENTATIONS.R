@@ -25,32 +25,33 @@ library(patchwork)
 
 ########################## SAVE ALL PLOTS ####################################
 
+
+
+# imputed data?
+impute <- T
+impute_lab <- ifelse(impute,"_MI","")
+
+
 lapply(outcomes, function(outcome) {
-    
-  lapply(c(T,F), function(impute) {
-    
-    # lab
-    impute_lab <- ifelse(impute,"_MI","")
-    
-    # Open graphs
-    plot_pgi <- readRDS(paste0("plots/by_outcome/",outcome,"_PGI",impute_lab,".rds"))
-    plot_obs <- readRDS(paste0("plots/by_outcome/",outcome,"_observed",impute_lab,".rds"))
+
+  # Open graphs
+  plot_pgi <- readRDS(paste0("plots/by_outcome/",outcome,"_PGI",impute_lab,".rds"))
+  plot_obs <- readRDS(paste0("plots/by_outcome/",outcome,"_observed",impute_lab,".rds"))
+
+  # combine plots
+  plot_pgi + plot_obs +
+    plot_layout(guides = "collect") &  # Note the & instead of +
+    theme(
+      legend.text=element_text(size=15),
+      legend.position = "bottom",
+      legend.justification = "center",
+      legend.box.just = "center",
+      aspect.ratio=1
+    ) 
   
-    # combine plots
-    plot_pgi + plot_obs +
-      plot_layout(guides = "collect") &  # Note the & instead of +
-      theme(
-        legend.text=element_text(size=15),
-        legend.position = "bottom",
-        legend.justification = "center",
-        legend.box.just = "center",
-        aspect.ratio=1
-      ) 
-    
-    # save
-    ggsave(paste0("plots/by_outcome/",outcome,impute_lab,".pdf"), width = 13, height = 6, dpi = 300)
-  
-  })
+  # save
+  ggsave(paste0("plots/by_outcome/",outcome,impute_lab,".pdf"), width = 13, height = 6, dpi = 300)
+
 })
 
 
