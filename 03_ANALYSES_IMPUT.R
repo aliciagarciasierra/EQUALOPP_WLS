@@ -15,14 +15,11 @@ source("00_MASTER.R")
 outcomes <- OUTCOMES   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 10
+n_boot <- 1000
 
 # Number of imputed datasets:
+
 m <- 10
-
-
-
-
 
 # Run for both PGIs and observed abilities:
 for (natural_talents in NT) {
@@ -40,7 +37,7 @@ for (natural_talents in NT) {
       ########################## MODELS ESTIMATION ####################################
       
       # ------- read data
-      data_list <-readRDS(paste0("data/final_datasets_",outcome,".rds"))
+      data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
       
       # check sample size and families
       data_example <- data_list[[1]]
@@ -182,7 +179,7 @@ for (natural_talents in NT) {
                       position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
         labs(title = title, x = " ", y = " ") +  # Set custom title
         geom_text(aes(label = round(Estimate, 2)), 
-                  position = position_dodge(width = 1), vjust = -1.5, hjust = -0.1, size = 4) + 
+                  position = position_dodge(width = 1), vjust = -3.5, hjust = -0.1, size = 4) + 
         
         # Add labels
         scale_x_discrete(labels = OUTCOMES.labs) +
@@ -190,6 +187,9 @@ for (natural_talents in NT) {
         
         # Customize legend
         guides(fill = guide_legend(title = NULL)) +
+        
+        # This is to make sure that the labels are on top and not overlapping the bars in the combined plot
+        coord_cartesian(clip = "off") + 
         
         # Theme adjustments
         theme_bw(base_size = 15) +  # Set base font size
@@ -245,7 +245,7 @@ for (natural_talents in NT) {
     geom_errorbar(aes(ymin = Lower, ymax = Upper), 
                   position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
     labs(title = " ", x = " ", y = " ") +
-    geom_text(aes(label = round(Estimate, 2)), position = position_dodge(width = 1), vjust =-1.5 ,hjust=-0.1) + 
+    geom_text(aes(label = round(Estimate, 2)), position = position_dodge(width = 1), vjust =-3.5 ,hjust=0) + 
     
     # Add labels
     scale_fill_discrete(labels = c("Sibcorr" = "Sibling correlation", 
@@ -253,13 +253,18 @@ for (natural_talents in NT) {
                                    "IORAD" = "Radical IOP")) +
     # Theme
     guides(fill = guide_legend(title = NULL)) +
+    
+    # This is to make sure that the labels are on top and not overlapping the bars in the combined plot
+    coord_cartesian(clip = "off") + 
+    
     # Theme adjustments
     theme_bw(base_size = 15) +  # Set base font size
     theme(
-      axis.title.x = element_text(size = 16, face = "bold"),  # Increase x-axis title size
-      axis.title.y = element_text(size = 16, face = "bold"),  # Increase y-axis title size
-      axis.text.x = element_text(size = 14),  # Increase x-axis text size
-      axis.text.y = element_text(size = 14),  # Increase y-axis text size
+      axis.title.x = element_text(size = 18, face = "bold"),  # Increase x-axis title size
+      axis.title.y = element_text(size = 18, face = "bold"),  # Increase y-axis title size
+      axis.text.x = element_text(size = 18),  # Increase x-axis text size
+      axis.text.y = element_text(size = 16),  # Increase y-axis text size
+      legend.text = element_text(size = 16),  # Legend text size
       panel.grid.major = element_blank(),  # Remove major grid lines
       panel.grid.minor = element_blank(),  # Remove minor grid lines
       plot.margin = margin(10, 10, 10, 10)  # Add space around the plot
