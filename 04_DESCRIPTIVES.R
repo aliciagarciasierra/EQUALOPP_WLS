@@ -4,7 +4,9 @@
 ###################################################################################
 
 source("00_MASTER.R")
-siblings <- readRDS("data/siblings.rds")
+
+outcome <- "education"
+data_list <- readRDS(paste0("data/final_datasets_",outcome,".rds"))
 
 siblings <- siblings %>%
   mutate_if(is.numeric, scale)
@@ -55,11 +57,76 @@ print(descriptive_stats_long)
 
 write_xlsx(descriptive_stats_long, path = "descriptives.xlsx")
 
+
+
+
+
+
+####################################################################
+######################## TABLE RESULTS #############################
+####################################################################
+
+# Select outcome
+outcome <- "education"
+
+# Loop over ability definition
+results_nt <- lapply(NT, function(natural_talents) {
+
+  # Full sample results
+  results_full <- readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), 
+                          sheet = "For plotting")
+  # Add index
+  results_full <- results_full %>% mutate(Sample = "Complete")
+  
+  # Gender results
+  results_sex <- lapply(c(0,1), function(which_sex) {
+    # Gender label
+    sex_lab <- ifelse(which_sex==0,"Brothers","Sisters")
+    # Read
+    results <- readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_",sex_lab,"_MI.xlsx"), sheet = "For plotting") 
+    # Add index
+    results <- results %>% mutate(Sample = sex_lab)
+  })
+  
+  bind_rows(results_full, results_sex) %>% mutate(Natural_Talents = natural_talents)
+
+})
+
+# Combine results
+results <- bind_rows(results_nt) 
+
+# Compute SE from CIs
+results <- results %>% 
+  mutate(SE = (Upper - Lower) / (2*1.96)) %>% 
+  select(-Upper, -Lower) 
+
+# Reshape to wide format
+wide_df <- results %>%
+  pivot_wider( names_from = Index, values_from = c(Estimate, SE), names_sep = "_")
+
+# Reorder variables
+wide_df %>% 
+  select(Natural_Talents,  Sample, 
+         Estimate_Sibcorr, SE_Sibcorr, 
+         Estimate_IOLIB,   SE_IOLIB,
+         Estimate_IORAD,   SE_IORAD) 
+
+# TO CONTINUE
+latex_table <- wide_df %>%
+  mutate(
+    row_text = glue(
+      "& {Sample} & ${round(Estimate_Sibcorr, 2)}$ & $({round(SE_Sibcorr, 2)})$ & ${round(Estimate_IOLIB, 2)}$ & $({round(SE_IOLIB, 2)})$ & ${round(difference, 2)}^{{*}}$ \\\\"
+    )) %>% pull(row_text)
+
+
+
+
 ####################################################################
 ################## FIGURE 1: HEXBIN CHART ##############################
 ####################################################################
 
-siblings <- readRDS("siblings.rds")
+outcome <- "education"
+siblings <- readRDS(paste0("data/siblings_",outcome,".rds"))
 
 # Reshape to wide at the family level
 wide<-reshape(as.data.frame(siblings),direction="wide", idvar="familyID", timevar="withinID")

@@ -14,10 +14,10 @@ source("00_MASTER.R")
 outcomes <- OUTCOMES   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 1000
+n_boot <- 100
 
 # Number of imputed datasets:
-m <- 20
+m <- 2
 
 
 

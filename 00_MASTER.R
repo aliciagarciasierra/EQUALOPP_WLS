@@ -42,6 +42,7 @@ suppressPackageStartupMessages({
   library(car)
   library(mice)
   library(parallel)
+  library(xtable)
 })
 
 `%!in%` <- function(x, y) !(x %in% y)
