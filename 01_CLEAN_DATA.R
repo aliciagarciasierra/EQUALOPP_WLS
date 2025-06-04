@@ -17,8 +17,8 @@ if ("health_pc" %in% outcome_vars) outcome_vars <- c(outcome_vars, health_vars)
 # Imputation:
 impute         <- T
 
-m              <- 2
-maxit          <- 25
+m              <- 25
+maxit          <- 5
 
 # Filters:
 age_filter     <- F

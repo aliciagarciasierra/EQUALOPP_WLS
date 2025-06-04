@@ -12,14 +12,14 @@ source("00_MASTER.R")
 ########################## SETUP ####################################
 
 # Compute for desired outcomes, even only one
-outcomes <- OUTCOMES   # OUTCOMES is defined in 00_MASTER.R
+outcomes <- "education"   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 10
+n_boot <- 1000
 
 # Number of imputed datasets:
 
-m <- 10
+m <- 25
 
 # Run for both PGIs and observed abilities:
 for (natural_talents in NT) {

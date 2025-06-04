@@ -11,13 +11,13 @@ source("00_MASTER.R")
 ########################## SETUP ####################################
 
 # Compute for desired outcomes, even only one
-outcomes <- OUTCOMES   # OUTCOMES is defined in 00_MASTER.R
+outcomes <- "education"   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 100
+n_boot <- 1000
 
 # Number of imputed datasets:
-m <- 2
+m <- 25
 
 
 
