@@ -29,7 +29,7 @@ outlier_filter <- F
 # FAST READ FROM RDS  ------------------
 
 data       <- readRDS("data/data.rds")
-pgi_cog    <- readRDS("data/pgi_cog.rds")
+ypgi_cog    <- readRDS("data/pgi_cog.rds")
 pgi_noncog <- readRDS("data/pgi_noncog.rds")
 
 print("finished reading raw data.")

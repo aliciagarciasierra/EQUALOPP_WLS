@@ -15,11 +15,27 @@ source("00_MASTER.R")
 outcomes <- "education"   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 1000
+n_boot <- 100
 
 # Number of imputed datasets:
 
 m <- 25
+
+# Check number of siblings per family
+data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
+n_siblings_list <- lapply(data_list, function(dataset) {
+  n_siblings <- dataset %>% 
+    group_by(familyID) %>% 
+    summarise(count = n_distinct(ID)) %>%
+    ungroup()
+  
+  return(n_siblings)
+})
+
+# Check siblings
+n_siblings_first_dataset <- n_siblings_list[[1]]
+summary(n_siblings_first_dataset$count) # only 2
+
 
 # Run for both PGIs and observed abilities:
 for (natural_talents in NT) {
@@ -99,15 +115,28 @@ for (natural_talents in NT) {
         , mc.cores = detectCores() - 1
         )
         
-        # Point estimates
-        coef_names      <- INDICES
-        point_estimates <- do.call(rbind, lapply(boot_results, function(boot_obj) boot_obj$t0))
+        # ---- Point estimates
+        point_estimates <- lapply(boot_results, function(boot_obj) boot_obj$t0)
+        # Convert 
+        point_estimates <- do.call(rbind, point_estimates) %>% data.frame()
+        # Add column with difference
+        point_estimates$diff <- point_estimates$X3-point_estimates$X2
         
-        # Boot estimates
+        
+        # ---- Boot estimates
         boot_matrices <- lapply(boot_results, function(boot_obj) {
-          colnames(boot_obj$t) <- coef_names
-          boot_obj$t
+          # Assign names
+          colnames(boot_obj$t) <- INDICES
+          # Convert to df
+          boot_df <- data.frame(boot_obj$t)
+          # Add column with difference
+          boot_df <- boot_df %>% mutate(diff = IORAD-IOLIB)
+          # Return 
+          boot_df
         })
+        
+        # Get column names 
+        coef_names <- colnames(boot_matrices[[1]])
         
         # Combine results using Rubin's rules
         mi_boot_results <- lapply(seq_along(coef_names), function(j) {
@@ -122,12 +151,17 @@ for (natural_talents in NT) {
           ci_lower <- theta_MI - qt(0.975, df) * sqrt(T_var)
           ci_upper <- theta_MI + qt(0.975, df) * sqrt(T_var)
           
+          # Compute p-value
+          t_stat <- theta_MI / sqrt(T_var)
+          p_value <- 2 * pt(-abs(t_stat), df)
+          
           return(data.frame(
             Index    = coef_names[j],
             Outcome  = outcome,
             Estimate = theta_MI,
             Lower    = ci_lower, 
-            Upper    = ci_upper
+            Upper    = ci_upper,
+            pval     = p_value
           ))
         })
         
@@ -158,61 +192,6 @@ for (natural_talents in NT) {
       saveWorkbook(wb, paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), overwrite = TRUE)
       
       
-      
-    
-      ################### GRAPH SEPARATED BY OUTCOME #########################
-    
-        
-      # Create plot title
-      title = paste0(OUTCOMES.labs[outcome], " with ", nt.labs[natural_talents])
-      
-      # Filter data for the current outcome
-      data_subset <- readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), sheet = "For plotting")
-      
-      # Sort Indices
-      data_subset$Index <- factor(data_subset$Index, levels=INDICES)
-      
-      # Create the plot for the current outcome
-      p <- ggplot(data_subset, aes(x = Outcome, y = Estimate, fill = Index)) +
-        geom_bar(stat = "identity", position = "dodge") +
-        geom_errorbar(aes(ymin = Lower, ymax = Upper), 
-                      position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
-        labs(title = title, x = " ", y = " ") +  # Set custom title
-        geom_text(aes(label = round(Estimate, 2)), 
-                  position = position_dodge(width = 1), vjust = -3.5, hjust = -0.1, size = 4) + 
-        
-        # Add labels
-        scale_x_discrete(labels = OUTCOMES.labs) +
-        scale_fill_discrete(labels = INDICES.labs) +
-        
-        # Customize legend
-        guides(fill = guide_legend(title = NULL)) +
-        
-        # This is to make sure that the labels are on top and not overlapping the bars in the combined plot
-        coord_cartesian(clip = "off") + 
-        
-        # Theme adjustments
-        theme_bw(base_size = 15) +  # Set base font size
-        theme(
-          axis.title.x = element_blank(),  
-          axis.text.x = element_blank(),  
-          axis.ticks.x = element_blank(),
-          axis.title.y = element_text(size = 16, face = "bold"),  # Increase y-axis title size
-          axis.text.y = element_text(size = 14),  # Increase y-axis text size
-          panel.grid.major = element_blank(),  # Remove major grid lines
-          panel.grid.minor = element_blank(),  # Remove minor grid lines
-          plot.margin = margin(10, 10, 10, 10),  # Add space around the plot
-          legend.position = "none",  # Remove the legend
-          plot.title = element_text(hjust = 0.5)) +
-        scale_y_continuous(limits = c(0, 0.65)) 
-      
-      
-      
-      # To view the plot:
-      p
-      
-      # To save the plot
-      saveRDS(p, paste0("plots/by_outcome/",outcome,"_",natural_talents,"_MI.rds"))
 
   }) # end of outcomes loop
   
@@ -232,6 +211,9 @@ for (natural_talents in NT) {
     readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), sheet = "For plotting")
   })
   ci_summary <- bind_rows(all_ci_summary)
+  
+  # Take out difference
+  ci_summary <- ci_summary %>% filter(Index %!in% c("diff"))
   
   # Custom order 
   ci_summary$Index   <- factor(ci_summary$Index,   levels = INDICES)

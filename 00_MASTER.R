@@ -43,6 +43,7 @@ suppressPackageStartupMessages({
   library(mice)
   library(parallel)
   library(xtable)
+  library(glue)
 })
 
 `%!in%` <- function(x, y) !(x %in% y)
@@ -94,7 +95,7 @@ ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "father_age_birth", "birt
 # Natural talents
 NT      = c("PGI", "observed")
 nt.labs = c("PGI"     = "PGIs", 
-            "observed"= "observed abilities")
+            "observed"= "Observed skills")
 
 # - observed
 OBSERVED_NON_COG <- c("extraversion", "openness", "neuroticism", "conscientiousness", "agreeableness")
@@ -118,6 +119,14 @@ m      <- 25
 
 
 ########################## FUNCTIONS ####################################
+
+add_stars <- function(p_values) {
+  # add significance stars
+  ifelse(p_values < 0.001, "***",
+         ifelse(p_values < 0.01, "**",
+                ifelse(p_values < 0.05, "*", "")))
+}
+
 
 #-------------- Function to compute the main indexes 
 compute_indexes <- function(outcome, data, natural_talents) {

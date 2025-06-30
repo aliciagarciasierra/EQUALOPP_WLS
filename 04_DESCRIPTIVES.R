@@ -63,7 +63,7 @@ write_xlsx(descriptive_stats_long, path = "descriptives.xlsx")
 
 
 ####################################################################
-######################## TABLE RESULTS #############################
+######################## TABLES OF RESULTS #########################
 ####################################################################
 
 # Select outcome
@@ -95,28 +95,160 @@ results_nt <- lapply(NT, function(natural_talents) {
 # Combine results
 results <- bind_rows(results_nt) 
 
+# Convert "Sample" to factor and sort
+results <- results %>% mutate(Sample = factor(Sample,levels=c("Complete","Sisters","Brothers")))
+
 # Compute SE from CIs
 results <- results %>% 
   mutate(SE = (Upper - Lower) / (2*1.96)) %>% 
   select(-Upper, -Lower) 
 
+
+
+####################################################################
+# -- Table 1: all indices
+
+# Extract difference and p-values
+differences <- results %>% 
+  filter(Index=="diff") %>% 
+  select(Natural_Talents, Sample, diff=Estimate, pval)
+
 # Reshape to wide format
 wide_df <- results %>%
-  pivot_wider( names_from = Index, values_from = c(Estimate, SE), names_sep = "_")
+  filter(Index!="diff") %>%
+  select(-pval,-Outcome) %>%
+  pivot_wider(names_from = Index, values_from = c(Estimate, SE), names_sep = "_")
+
+# Add difference between IORAD and IOLIB
+wide_df <- merge(wide_df, differences)
+
+# Recompute difference from rounded values
+wide_df <- wide_df %>% mutate(diff=round(Estimate_IORAD,2)-round(Estimate_IOLIB,2))
 
 # Reorder variables
-wide_df %>% 
+wide_df_1 <- wide_df %>% 
+  arrange(Natural_Talents, Sample) %>%
   select(Natural_Talents,  Sample, 
          Estimate_Sibcorr, SE_Sibcorr, 
          Estimate_IOLIB,   SE_IOLIB,
-         Estimate_IORAD,   SE_IORAD) 
+         Estimate_IORAD,   SE_IORAD,
+         diff, pval) 
 
-# TO CONTINUE
-latex_table <- wide_df %>%
+
+####################################################################
+# -- Table 2: difference between brothers and sisters
+
+# Open all runs to get correlation between PGI and observed on same sample
+point_estimates <- lapply(c("Brothers","Sisters"), function(sex_lab) {
+  est_nt <- lapply(NT, function(natural_talents) {
+    # Read
+    est <- readRDS(paste0("results/all_runs/",sex_lab,"_",natural_talents,".rds"))
+    # New names with natural talent indicator
+    new_lib <- paste0("IOLIB_",natural_talents)
+    new_rad <- paste0("IORAD_",natural_talents)
+    # Rename
+    est %>% select(!!new_lib := IOLIB, !!new_rad := IORAD)
+  })
+  # Combine  
+  est <- bind_cols(est_nt)
+  # Compute correlation
+  lib_cor <- cor(est$IOLIB_PGI, est$IOLIB_observed)
+  rad_cor <- cor(est$IORAD_PGI, est$IORAD_observed)
+  # Output
+  list(Index  = c("IOLIB", "IORAD"), 
+       Sample = c(sex_lab, sex_lab), 
+       Cor    = c(lib_cor, rad_cor))
+})
+
+correlations <- bind_rows(point_estimates)
+
+
+# Reshape to wide format
+wide_df <- results %>% 
+  filter(Index %in% c("IOLIB","IORAD"),
+         Sample != "Complete") %>%
+  select(Index, Estimate, SE, Sample, Natural_Talents) %>%
+  pivot_wider(names_from = Natural_Talents, values_from = c(Estimate, SE), names_sep = "_")
+
+# Add correlations
+wide_df <- merge(wide_df, correlations)
+
+# Add difference between PGI and observed and test (corrected for correlation)
+wide_df <- wide_df %>%
+  mutate(
+    diff    = abs(Estimate_PGI - Estimate_observed),
+    se_diff = sqrt(SE_PGI^2 + SE_observed^2 - 2 * Cor * SE_PGI * SE_observed),
+    t_stat  = diff / se_diff,
+    pval = 2 * pnorm(abs(t_stat), lower.tail = FALSE)
+  ) %>%
+  # Recompute difference for display purposes
+  mutate(diff = abs(round(Estimate_PGI,2) - round(Estimate_observed,2))) %>%
+  select(-t_stat) 
+
+# Sort
+wide_df <- wide_df %>% arrange(Index, Sample) 
+
+# Add rows with differences between brothers and sisters
+differences <- wide_df %>%
+  select(Index, Sample, diff, se_diff) %>%
+  pivot_wider(names_from = Sample, values_from = c(diff, se_diff)) %>%
+  mutate(
+    Sample            = NA_character_,
+    Estimate_PGI      = NA_real_,
+    Estimate_observed = NA_real_,
+    SE_PGI            = NA_real_,
+    SE_observed       = NA_real_,
+    diff    = diff_Sisters - diff_Brothers,
+    se_diff = sqrt(se_diff_Sisters^2 + se_diff_Brothers^2),
+    pval    = 2 * pnorm(abs(diff / se_diff), lower.tail = FALSE)
+  ) %>%
+  # Recompute difference for display purposes
+  mutate(diff = round(diff_Sisters,2)-round(diff_Brothers,2)) %>%
+  select(Index, Sample, Estimate_PGI, SE_PGI, Estimate_observed, SE_observed, diff, se_diff, pval) %>%
+  mutate(Sample = as.factor(Sample))
+
+# Combine with original data
+wide_df_2 <- bind_rows(wide_df, differences) %>%
+  arrange(Index, is.na(Sample))
+
+
+####################################################################
+# --- Combine tables and correct p-values
+
+# Add index and bind tables
+wide_df_1$id <- 1:nrow(wide_df_1)
+wide_df_2$id <- (nrow(wide_df_1)+1):(nrow(wide_df_1)+nrow(wide_df_2))
+all <- bind_rows(select(wide_df_1,pval,id), select(wide_df_2,pval,id))
+
+# Correct p-values and add stars
+all <- all %>% 
+  mutate(corr_pval = p.adjust(pval, method = "holm"),
+         stars     = add_stars(corr_pval)) %>% select(-pval)
+
+# Merge again with original tables
+wide_df_1 <- merge(wide_df_1, all, by="id")
+wide_df_2 <- merge(wide_df_2, all, by="id")
+
+
+####################################################################
+# --- Print in Latex format
+
+# Table 1
+latex_table <- wide_df_1 %>%
   mutate(
     row_text = glue(
-      "& {Sample} & ${round(Estimate_Sibcorr, 2)}$ & $({round(SE_Sibcorr, 2)})$ & ${round(Estimate_IOLIB, 2)}$ & $({round(SE_IOLIB, 2)})$ & ${round(difference, 2)}^{{*}}$ \\\\"
+      "& {Sample} & ${round(Estimate_Sibcorr, 2)}$ $({round(SE_Sibcorr, 2)})$ & ${round(Estimate_IOLIB, 2)}$ $({round(SE_IOLIB, 2)})$ & ${round(Estimate_IORAD, 2)}$ $({round(SE_IORAD, 2)})$ & ${round(diff, 2)}^{stars}$ \\\\"
     )) %>% pull(row_text)
+latex_table
+
+# Table 2
+latex_table <- wide_df_2 %>%
+  mutate(
+    row_text = glue(
+      "& {Sample} & ${round(Estimate_PGI, 2)}$ $({round(SE_PGI, 2)})$ & ${round(Estimate_observed, 2)}$ $({round(SE_observed, 2)})$ & ${round(diff, 2)}^{stars}$ \\\\"
+    )) %>% pull(row_text)
+latex_table
+
 
 
 
