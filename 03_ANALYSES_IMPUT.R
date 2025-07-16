@@ -12,17 +12,17 @@ source("00_MASTER.R")
 ########################## SETUP ####################################
 
 # Compute for desired outcomes, even only one
-outcomes <- "education"   # OUTCOMES is defined in 00_MASTER.R
-
+outcomes  <- "education"   # OUTCOMES is defined in 00_MASTER.R
+  
 # Bootstrapping:
-n_boot <- 100
+n_boot <- 1000
 
 # Number of imputed datasets:
 
 m <- 25
 
 # Check number of siblings per family
-data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
+data_list <-readRDS(paste0("data/final_datasets_",outcomes[1],"_MI.rds"))
 n_siblings_list <- lapply(data_list, function(dataset) {
   n_siblings <- dataset %>% 
     group_by(familyID) %>% 
@@ -119,8 +119,12 @@ for (natural_talents in NT) {
         point_estimates <- lapply(boot_results, function(boot_obj) boot_obj$t0)
         # Convert 
         point_estimates <- do.call(rbind, point_estimates) %>% data.frame()
+        # Assign names
+        colnames(point_estimates) <- INDICES
         # Add column with difference
-        point_estimates$diff <- point_estimates$X3-point_estimates$X2
+        point_estimates$diff <- point_estimates$IORAD-point_estimates$IOLIB
+        # Write to file
+        saveRDS(point_estimates, paste0("results/all_runs/","Complete_",natural_talents,".rds"))
         
         
         # ---- Boot estimates

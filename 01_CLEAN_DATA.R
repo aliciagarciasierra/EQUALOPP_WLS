@@ -17,7 +17,7 @@ if ("health_pc" %in% outcome_vars) outcome_vars <- c(outcome_vars, health_vars)
 # Imputation:
 impute         <- T
 
-m              <- 25
+m              <- 2
 maxit          <- 5
 
 # Filters:
@@ -29,7 +29,7 @@ outlier_filter <- F
 # FAST READ FROM RDS  ------------------
 
 data       <- readRDS("data/data.rds")
-ypgi_cog    <- readRDS("data/pgi_cog.rds")
+pgi_cog    <- readRDS("data/pgi_cog.rds")
 pgi_noncog <- readRDS("data/pgi_noncog.rds")
 
 print("finished reading raw data.")
@@ -449,6 +449,7 @@ data_list <- if (impute) imputed_datasets_without_y else list(siblings_full)
 
 
 
+
 ########################## REMOVE THOSE WITH UNREALISTIC PARENTAL AGES  ##########################
 
 # Remove those with unrealistic parental ages
@@ -463,10 +464,9 @@ summary(first_imputed_dataset$father_age_birth) # works
 
   
 
+
 ########################## PRINCIPAL COMPONENTS FOR HEALTH  ##########################
   
-
-
 if (any(health_vars %in% colnames(data_list[[1]]))) {
     
   # Apply PCA to each filtered dataset

@@ -106,43 +106,63 @@ results <- results %>%
 
 
 ####################################################################
-# -- Table 1: all indices
+# -- Table 1: all indices and difference between Radical and Liberal
 
-# Extract difference and p-values
-differences <- results %>% 
+# Extract p-values
+pvalues <- results %>% 
   filter(Index=="diff") %>% 
-  select(Natural_Talents, Sample, diff=Estimate, pval)
+  select(Natural_Talents, Sample, pval)
 
 # Reshape to wide format
 wide_df <- results %>%
-  filter(Index!="diff") %>%
   select(-pval,-Outcome) %>%
   pivot_wider(names_from = Index, values_from = c(Estimate, SE), names_sep = "_")
 
-# Add difference between IORAD and IOLIB
-wide_df <- merge(wide_df, differences)
+# Add back pvalues
+wide_df <- merge(wide_df, pvalues)
 
-# Recompute difference from rounded values
-wide_df <- wide_df %>% mutate(diff=round(Estimate_IORAD,2)-round(Estimate_IOLIB,2))
+# Compute difference of differences
+diff_in_diff <- wide_df %>%
+  select(Natural_Talents, Sample, Estimate_diff, SE_diff) %>%
+  pivot_wider(names_from = Natural_Talents, values_from = c(Estimate_diff, SE_diff)) %>%
+  mutate(
+    Estimate_Sibcorr  = NA_real_,
+    Estimate_IOLIB    = NA_real_,
+    Estimate_IORAD    = NA_real_,
+    SE_Sibcorr        = NA_real_,
+    SE_IOLIB          = NA_real_,
+    SE_IORAD          = NA_real_,
+    Estimate_diff     = Estimate_diff_observed - Estimate_diff_PGI,
+    SE_diff           = sqrt(SE_diff_observed^2 + SE_diff_PGI^2),
+    pval              = 2 * pnorm(abs(Estimate_diff / SE_diff), lower.tail = FALSE)
+  ) %>%
+  # Recompute difference for display purposes
+  mutate(Estimate_diff = round(Estimate_diff_observed,2)-round(Estimate_diff_PGI,2))
+  
+
+# Combine with original data
+wide_df <- bind_rows(wide_df, diff_in_diff) 
+
 
 # Reorder variables
 wide_df_1 <- wide_df %>% 
-  arrange(Natural_Talents, Sample) %>%
-  select(Natural_Talents,  Sample, 
+  arrange(Sample, Natural_Talents) %>%
+  select(Sample, Natural_Talents, 
          Estimate_Sibcorr, SE_Sibcorr, 
          Estimate_IOLIB,   SE_IOLIB,
          Estimate_IORAD,   SE_IORAD,
-         diff, pval) 
+         Estimate_diff, pval) 
+
 
 
 ####################################################################
-# -- Table 2: difference between brothers and sisters
+# -- Table 2: difference between PGI and Observed
 
-# Open all runs to get correlation between PGI and observed on same sample
-point_estimates <- lapply(c("Brothers","Sisters"), function(sex_lab) {
+# Open all runs to get correlation between PGI and Observed on same sample
+point_estimates <- lapply(c("Brothers","Sisters","Complete"), function(sample) {
   est_nt <- lapply(NT, function(natural_talents) {
     # Read
-    est <- readRDS(paste0("results/all_runs/",sex_lab,"_",natural_talents,".rds"))
+    est <- readRDS(paste0("results/all_runs/",sample,"_",natural_talents,".rds"))
     # New names with natural talent indicator
     new_lib <- paste0("IOLIB_",natural_talents)
     new_rad <- paste0("IORAD_",natural_talents)
@@ -156,7 +176,7 @@ point_estimates <- lapply(c("Brothers","Sisters"), function(sex_lab) {
   rad_cor <- cor(est$IORAD_PGI, est$IORAD_observed)
   # Output
   list(Index  = c("IOLIB", "IORAD"), 
-       Sample = c(sex_lab, sex_lab), 
+       Sample = c(sample, sample), 
        Cor    = c(lib_cor, rad_cor))
 })
 
@@ -165,8 +185,7 @@ correlations <- bind_rows(point_estimates)
 
 # Reshape to wide format
 wide_df <- results %>% 
-  filter(Index %in% c("IOLIB","IORAD"),
-         Sample != "Complete") %>%
+  filter(Index %in% c("IOLIB","IORAD")) %>%
   select(Index, Estimate, SE, Sample, Natural_Talents) %>%
   pivot_wider(names_from = Natural_Talents, values_from = c(Estimate, SE), names_sep = "_")
 
@@ -176,40 +195,17 @@ wide_df <- merge(wide_df, correlations)
 # Add difference between PGI and observed and test (corrected for correlation)
 wide_df <- wide_df %>%
   mutate(
-    diff    = abs(Estimate_PGI - Estimate_observed),
+    diff    = Estimate_PGI - Estimate_observed,
     se_diff = sqrt(SE_PGI^2 + SE_observed^2 - 2 * Cor * SE_PGI * SE_observed),
     t_stat  = diff / se_diff,
     pval = 2 * pnorm(abs(t_stat), lower.tail = FALSE)
   ) %>%
   # Recompute difference for display purposes
-  mutate(diff = abs(round(Estimate_PGI,2) - round(Estimate_observed,2))) %>%
+  mutate(diff = round(Estimate_PGI,2) - round(Estimate_observed,2)) %>%
   select(-t_stat) 
 
 # Sort
-wide_df <- wide_df %>% arrange(Index, Sample) 
-
-# Add rows with differences between brothers and sisters
-differences <- wide_df %>%
-  select(Index, Sample, diff, se_diff) %>%
-  pivot_wider(names_from = Sample, values_from = c(diff, se_diff)) %>%
-  mutate(
-    Sample            = NA_character_,
-    Estimate_PGI      = NA_real_,
-    Estimate_observed = NA_real_,
-    SE_PGI            = NA_real_,
-    SE_observed       = NA_real_,
-    diff    = diff_Sisters - diff_Brothers,
-    se_diff = sqrt(se_diff_Sisters^2 + se_diff_Brothers^2),
-    pval    = 2 * pnorm(abs(diff / se_diff), lower.tail = FALSE)
-  ) %>%
-  # Recompute difference for display purposes
-  mutate(diff = round(diff_Sisters,2)-round(diff_Brothers,2)) %>%
-  select(Index, Sample, Estimate_PGI, SE_PGI, Estimate_observed, SE_observed, diff, se_diff, pval) %>%
-  mutate(Sample = as.factor(Sample))
-
-# Combine with original data
-wide_df_2 <- bind_rows(wide_df, differences) %>%
-  arrange(Index, is.na(Sample))
+wide_df_2 <- wide_df %>% arrange(Index, Sample) 
 
 
 ####################################################################
@@ -237,7 +233,7 @@ wide_df_2 <- merge(wide_df_2, all, by="id")
 latex_table <- wide_df_1 %>%
   mutate(
     row_text = glue(
-      "& {Sample} & ${round(Estimate_Sibcorr, 2)}$ $({round(SE_Sibcorr, 2)})$ & ${round(Estimate_IOLIB, 2)}$ $({round(SE_IOLIB, 2)})$ & ${round(Estimate_IORAD, 2)}$ $({round(SE_IORAD, 2)})$ & ${round(diff, 2)}^{stars}$ \\\\"
+      "& {Natural_Talents} & ${round(Estimate_Sibcorr, 2)}$ $({round(SE_Sibcorr, 2)})$ & ${round(Estimate_IOLIB, 2)}$ $({round(SE_IOLIB, 2)})$ & ${round(Estimate_IORAD, 2)}$ $({round(SE_IORAD, 2)})$ & ${round(Estimate_diff, 2)}^{stars}$ \\\\"
     )) %>% pull(row_text)
 latex_table
 

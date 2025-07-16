@@ -17,7 +17,7 @@ outcomes <- "education"   # OUTCOMES is defined in 00_MASTER.R
 n_boot <- 10
 
 # Number of imputed datasets:
-m <- 15
+m <- 25
 
 
 
@@ -32,17 +32,23 @@ sapply(outcomes, function(outcome) {
   # read all
   data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
   
+  # Loop over sex
   lapply(c(0,1), function(which_sex) {
     # Set label
     sex_lab <- ifelse(which_sex==0,"Brothers","Sisters")
-    # filter by gender
-    df <- data_list[[1]] %>%
-      group_by(familyID) %>%
-      filter(all(sex == which_sex)) %>%
-      ungroup() %>% 
-      select(-sex) 
+    
+    # Loop over all datasets
+    sample_sizes <- sapply(data_list, function(df) {
+      df %>%
+        group_by(familyID) %>%
+        filter(all(sex == which_sex)) %>%
+        ungroup() %>% 
+        select(-sex) %>% 
+        nrow()
+    })
     # Print sample size
-    paste0(sex_lab, " N:", nrow(df))
+    print(paste0(sex_lab," min N:", min(sample_sizes)))
+    print(paste0(sex_lab," max N:", max(sample_sizes)))
     
   })
   
