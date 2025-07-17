@@ -273,6 +273,7 @@ ci_summary <- ci_summary %>% filter(Index %!in% c("diff"))
 
 # Custom order 
 ci_summary$Index   <- factor(ci_summary$Index,   levels = INDICES)
+ci_summary$sex   <- factor(ci_summary$sex,   levels = c("Sisters","Brothers"))
 ci_summary$Outcome <- factor(ci_summary$Outcome, levels = outcomes)
 ci_summary$ability <- factor(ci_summary$ability, levels = c("PGI", "observed"))
 
@@ -303,7 +304,7 @@ ggplot(ci_summary, aes(x = Outcome, y = Estimate, fill = Index)) +
     axis.text.x = element_blank(), 
     axis.ticks.x = element_blank(),
     panel.grid.minor = element_blank(),
-    strip.background = element_rect(fill = "goldenrod1", color = "grey30", linewidth = 0.8),  # Updated here
+    strip.background = element_rect(fill = "white"),  # Updated here
     #strip.text = element_text(size = 14),
     legend.margin = margin(t = -15),
     plot.margin = margin(b = 1),

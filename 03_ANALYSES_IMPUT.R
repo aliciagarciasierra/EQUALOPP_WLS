@@ -198,19 +198,26 @@ for (natural_talents in NT) {
       
 
   }) # end of outcomes loop
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  ######################### GRAPH ALL OUTCOMES ###############################
-  
+
+} # end of natural_talents loop
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################### GRAPH ALL OUTCOMES ###############################
+
+# Run for both PGIs and observed abilities:
+for (natural_talents in NT) {
+    
   all_ci_summary <- lapply(outcomes, function(outcome) {
     readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), sheet = "For plotting")
   })
@@ -222,6 +229,7 @@ for (natural_talents in NT) {
   # Custom order 
   ci_summary$Index   <- factor(ci_summary$Index,   levels = INDICES)
   ci_summary$Outcome <- factor(ci_summary$Outcome, levels = outcomes)
+  ci_summary$Ability <- natural_talents
   
   
   # Create the bar graph
@@ -243,6 +251,9 @@ for (natural_talents in NT) {
     # This is to make sure that the labels are on top and not overlapping the bars in the combined plot
     coord_cartesian(clip = "off") + 
     
+    # Grid
+    facet_wrap(~ Ability, labeller = labeller(Ability = nt.labs)) +
+    
     # Theme adjustments
     theme_bw(base_size = 15) +  # Set base font size
     theme(
@@ -253,16 +264,16 @@ for (natural_talents in NT) {
       legend.text = element_text(size = 16),  # Legend text size
       panel.grid.major = element_blank(),  # Remove major grid lines
       panel.grid.minor = element_blank(),  # Remove minor grid lines
-      plot.margin = margin(10, 10, 10, 10)  # Add space around the plot
+      plot.margin = margin(10, 10, 10, 10),  # Add space around the plot
+      strip.background = element_rect(fill = "white")
     ) +
-    ylim(c(-0.05,0.52)) +
-    ggtitle(paste0("",nt.labs[natural_talents]))
+    ylim(c(-0.05,0.52))
+    #ggtitle(paste0("",nt.labs[natural_talents]))
   
   
   # Save the plot
   ggsave(paste0("plots/",natural_talents,"_MI.png"), width = 13, height = 6, dpi = 300)
 
 
-
-  
 } # end of natural_talents loop
+

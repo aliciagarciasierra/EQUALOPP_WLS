@@ -47,20 +47,24 @@ lapply(NT, function(natural_talents) {
   data_subset <- data_subset %>% filter(Index != "diff")
   
   # Sort Indices
-  data_subset$Index <- factor(data_subset$Index, levels=INDICES)
+  data_subset$Index   <- factor(data_subset$Index, levels=INDICES)
+  data_subset$Ability <- natural_talents
   
   # Create the plot for the current outcome
   p <- ggplot(data_subset, aes(x = Outcome, y = Estimate, fill = Index)) +
     geom_bar(stat = "identity", position = "dodge") +
     geom_errorbar(aes(ymin = Lower, ymax = Upper), 
                   position = position_dodge(0.9), width = 0.25, alpha = 0.9) +
-    labs(title=title, x = " ", y = " ") +  # Set custom title
+    labs(x = " ", y = " ") +  # Set custom title
     geom_text(aes(label = round(Estimate, 2)), 
               position = position_dodge(width = 0.9), vjust = -2.5, size = 9) + 
     
     # Add labels
     scale_x_discrete(labels = OUTCOMES.labs) +
     scale_fill_discrete(labels = INDICES.labs) +
+    
+    # Grid
+    facet_wrap(~ Ability, labeller = labeller(Ability = nt.labs)) +
     
     # Customize legend
     guides(fill = guide_legend(title = NULL)) +
@@ -74,10 +78,11 @@ lapply(NT, function(natural_talents) {
       panel.grid.minor = element_blank(),  # Remove minor grid lines
       plot.margin = margin(10, 10, 10, 10),  # Add space around the plot
       legend.position = "none",  # Remove the legend
-      plot.title = element_text(size=30,hjust = 0.5)) +
-    scale_y_continuous(limits = c(0, 0.65)) 
-  
-  
+      plot.title = element_text(size=30,hjust = 0.5),
+      strip.background = element_rect(fill = "white")
+    ) +
+    
+    scale_y_continuous(limits = c(0, 0.65))
   
   # To view the plot:
   p

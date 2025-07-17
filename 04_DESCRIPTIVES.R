@@ -8,9 +8,6 @@ source("00_MASTER.R")
 outcome <- "education"
 data_list <- readRDS(paste0("data/final_datasets_",outcome,".rds"))
 
-siblings <- siblings %>%
-  mutate_if(is.numeric, scale)
-
 
 
 ####################################################################
@@ -72,13 +69,13 @@ outcome <- "education"
 # Loop over ability definition
 results_nt <- lapply(NT, function(natural_talents) {
 
-  # Full sample results
+  # -- Complete sample results
   results_full <- readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), 
                           sheet = "For plotting")
   # Add index
   results_full <- results_full %>% mutate(Sample = "Complete")
   
-  # Gender results
+  # -- Gender results
   results_sex <- lapply(c(0,1), function(which_sex) {
     # Gender label
     sex_lab <- ifelse(which_sex==0,"Brothers","Sisters")
@@ -88,6 +85,7 @@ results_nt <- lapply(NT, function(natural_talents) {
     results <- results %>% mutate(Sample = sex_lab)
   })
   
+  # -- Combine
   bind_rows(results_full, results_sex) %>% mutate(Natural_Talents = natural_talents)
 
 })
@@ -132,12 +130,12 @@ diff_in_diff <- wide_df %>%
     SE_Sibcorr        = NA_real_,
     SE_IOLIB          = NA_real_,
     SE_IORAD          = NA_real_,
-    Estimate_diff     = Estimate_diff_observed - Estimate_diff_PGI,
+    Estimate_diff     = Estimate_diff_PGI - Estimate_diff_observed ,
     SE_diff           = sqrt(SE_diff_observed^2 + SE_diff_PGI^2),
     pval              = 2 * pnorm(abs(Estimate_diff / SE_diff), lower.tail = FALSE)
   ) %>%
   # Recompute difference for display purposes
-  mutate(Estimate_diff = round(Estimate_diff_observed,2)-round(Estimate_diff_PGI,2))
+  mutate(Estimate_diff = round(Estimate_diff_PGI,2) - round(Estimate_diff_observed,2))
   
 
 # Combine with original data
