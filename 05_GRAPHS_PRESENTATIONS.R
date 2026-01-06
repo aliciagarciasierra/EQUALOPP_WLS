@@ -10,35 +10,19 @@ source("00_MASTER.R")
 ########################## SETUP ####################################
 
 # Set which outcomes to plot
-outcomes <- OUTCOMES
+outcome <- "education"
 
 # Which data to read
-impute <- F
-
-# Ensure the patchwork package is installed and loaded
-if (!requireNamespace("patchwork", quietly = TRUE)) {
-  install.packages("patchwork")
-}
-library(patchwork)
-
-
-
-########################## SAVE ALL PLOTS ####################################
-
-
-
-# imputed data?
 impute <- T
 impute_lab <- ifelse(impute,"_MI","")
+
+
 
 
 
 ################### GRAPH SEPARATED BY OUTCOME #########################
 
 lapply(NT, function(natural_talents) {
-
-  # Create plot title
-  title = nt.labs[natural_talents]
   
   # Filter data for the current outcome
   data_subset <- readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,impute_lab,".xlsx"), sheet = "For plotting")
@@ -55,13 +39,12 @@ lapply(NT, function(natural_talents) {
     geom_bar(stat = "identity", position = "dodge") +
     geom_errorbar(aes(ymin = Lower, ymax = Upper), 
                   position = position_dodge(0.9), width = 0.25, alpha = 0.9) +
-    labs(x = " ", y = " ") +  # Set custom title
+    labs(x = " ", y = " ") + 
     geom_text(aes(label = round(Estimate, 2)), 
               position = position_dodge(width = 0.9), vjust = -2.5, size = 9) + 
     
     # Add labels
     scale_x_discrete(labels = OUTCOMES.labs) +
-    scale_fill_discrete(labels = INDICES.labs) +
     
     # Grid
     facet_wrap(~ Ability, labeller = labeller(Ability = nt.labs)) +
@@ -70,19 +53,22 @@ lapply(NT, function(natural_talents) {
     guides(fill = guide_legend(title = NULL)) +
     
     # Theme adjustments
-    theme_bw(base_size = 40) +  # Set base font size
+    theme_minimal(base_size = 35) +  # Set base font size
     theme(
       axis.title.x = element_blank(),  
       axis.text.x = element_blank(),  
       axis.ticks.x = element_blank(),
       panel.grid.minor = element_blank(),  # Remove minor grid lines
-      plot.margin = margin(10, 10, 10, 10),  # Add space around the plot
+      panel.grid.major.x = element_blank(),
       legend.position = "none",  # Remove the legend
-      plot.title = element_text(size=30,hjust = 0.5),
-      strip.background = element_rect(fill = "white")
+      legend.key.size = unit(1,"cm")
     ) +
     
-    scale_y_continuous(limits = c(0, 0.65))
+    scale_y_continuous(limits = c(0, 0.65)) +
+    
+    # Color scale
+    scale_fill_manual(labels = INDICES.labs, values=c("#FDE725FF", "#5DC863FF", "#5287EB"))
+    
   
   # To view the plot:
   p
@@ -93,60 +79,30 @@ lapply(NT, function(natural_talents) {
 })
 
 
-
-
 # Combine 
 
-lapply(outcomes, function(outcome) {
+# Open graphs
+plot_pgi <- readRDS(paste0("plots/by_outcome/",outcome,"_PGI",impute_lab,".rds"))
+plot_obs <- readRDS(paste0("plots/by_outcome/",outcome,"_observed",impute_lab,".rds"))
 
-  # Open graphs
-  plot_pgi <- readRDS(paste0("plots/by_outcome/",outcome,"_PGI",impute_lab,".rds"))
-  plot_obs <- readRDS(paste0("plots/by_outcome/",outcome,"_observed",impute_lab,".rds"))
-
-  # combine plots
-  plot_pgi + plot_obs +
-    plot_layout(guides = "collect") &  # Note the & instead of +
-    theme(
-      legend.text=element_text(size=30),
-      legend.position = "bottom",
-      legend.justification = "center",
-      legend.box.just = "center",
-      aspect.ratio=1
-    ) 
-  
-  # save
-  ggsave(paste0("plots/by_outcome/",outcome,impute_lab,".pdf"), width = 15, height = 8)
-
-})
-
-
-
-
-
-
-########################## SHOW SINGLE OUTCOME ####################################
-
-# Set preferred outcome and data
-outcome <-"education" 
-
-# lab
-impute_lab <- ifelse(impute,"_MI","")
-
-# Open lists with graphs
-plots_list_pgi <- readRDS(paste0("plots/by_outcome/plots_list_PGI",impute_lab,".rds"))
-plots_list_obs <- readRDS(paste0("plots/by_outcome/plots_list_observed",impute_lab,".rds"))
-
-# Combine the two plots 
-combined_plot <- plots_list_pgi[[outcome]] + 
-  plots_list_obs[[outcome]] +
+# combine plots
+plot_pgi + plot_obs +
   plot_layout(guides = "collect") &  # Note the & instead of +
   theme(
-    legend.text=element_text(size=15),
+    legend.text=element_text(size=30),
     legend.position = "bottom",
     legend.justification = "center",
     legend.box.just = "center",
     aspect.ratio=1
   ) 
-# Display the combined plot
-print(combined_plot)
+
+# save
+ggsave(paste0("plots/",outcome,impute_lab,".jpeg"), width = 15, height = 8)
+
+
+
+
+
+
+
 

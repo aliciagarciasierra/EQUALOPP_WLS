@@ -15,52 +15,32 @@ source("00_MASTER.R")
 outcomes  <- "education"   # OUTCOMES is defined in 00_MASTER.R
   
 # Bootstrapping:
-n_boot <- 1000
+n_boot <- 100
 
 # Number of imputed datasets:
 
-m <- 25
-
-# Check number of siblings per family
-data_list <-readRDS(paste0("data/final_datasets_",outcomes[1],"_MI.rds"))
-n_siblings_list <- lapply(data_list, function(dataset) {
-  n_siblings <- dataset %>% 
-    group_by(familyID) %>% 
-    summarise(count = n_distinct(ID)) %>%
-    ungroup()
-  
-  return(n_siblings)
-})
-
-# Check siblings
-n_siblings_first_dataset <- n_siblings_list[[1]]
-summary(n_siblings_first_dataset$count) # only 2
+m <- 20
 
 
-# Run for both PGIs and observed abilities:
-for (natural_talents in NT) {
-  
-  # Run for each outcome:
-  lapply(outcomes, function(outcome) {
-      
-      # ------- check
+
+
+########################## RUN ####################################
+
+for (outcome in outcomes) {
+    
+  # Run for both PGIs and observed abilities:
+  mclapply(NT, function(natural_talents) {
+    
+    # ------- check
       print(paste0("which talent: ",natural_talents))
       print(paste0("n bootstraps: ",n_boot))
       print(paste0("m: ",m))
       
       
-      
-      ########################## MODELS ESTIMATION ####################################
-      
       # ------- read data
       data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
       
-      # check sample size and families
-      data_example <- data_list[[1]]
-      n_distinct(data_example$ID)
-      n_distinct(data_example$familyID)
-      
-      # ------- scale numeric variables
+      <- # ------- scale numeric variables
       data_list <- lapply(data_list, function(df) {
         df %>% mutate_if(is.numeric, scale)
       })
@@ -68,6 +48,9 @@ for (natural_talents in NT) {
       # ------- subset all data for testing (change m for less imputed datasets)
       data_list <- data_list[1:m]
       
+      
+      
+      ########################## MODELS ESTIMATION ####################################
       
       
       ######################## POINT VALUES ##############################
@@ -174,7 +157,6 @@ for (natural_talents in NT) {
       
       
       # ------- Run bootstrapping
-      print("compute bootstrapping")
       boot_results <- mi_cluster_boot(data_list, outcome, n_boot)
       
       
@@ -196,84 +178,16 @@ for (natural_talents in NT) {
       saveWorkbook(wb, paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), overwrite = TRUE)
       
       
-
-  }) # end of outcomes loop
-
-} # end of natural_talents loop
-
-
-
-
-
-
-
-
-
-
-
-
-
-######################### GRAPH ALL OUTCOMES ###############################
-
-# Run for both PGIs and observed abilities:
-for (natural_talents in NT) {
-    
-  all_ci_summary <- lapply(outcomes, function(outcome) {
-    readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_MI.xlsx"), sheet = "For plotting")
-  })
-  ci_summary <- bind_rows(all_ci_summary)
-  
-  # Take out difference
-  ci_summary <- ci_summary %>% filter(Index %!in% c("diff"))
-  
-  # Custom order 
-  ci_summary$Index   <- factor(ci_summary$Index,   levels = INDICES)
-  ci_summary$Outcome <- factor(ci_summary$Outcome, levels = outcomes)
-  ci_summary$Ability <- natural_talents
   
   
-  # Create the bar graph
-  # Main elements
-  ggplot(ci_summary, aes(x = Outcome, y = Estimate, fill = Index)) +
-    geom_bar(stat = "identity", position = "dodge") +
-    geom_errorbar(aes(ymin = Lower, ymax = Upper), 
-                  position = position_dodge(0.9), width = 0.25, alpha = 0.4) +
-    labs(title = " ", x = " ", y = " ") +
-    geom_text(aes(label = round(Estimate, 2)), position = position_dodge(width = 1), vjust =-3.5 ,hjust=0) + 
-    
-    # Add labels
-    scale_fill_discrete(labels = c("Sibcorr" = "Sibling correlation", 
-                                   "IOLIB" = "Liberal IOP", 
-                                   "IORAD" = "Radical IOP")) +
-    # Theme
-    guides(fill = guide_legend(title = NULL)) +
-    
-    # This is to make sure that the labels are on top and not overlapping the bars in the combined plot
-    coord_cartesian(clip = "off") + 
-    
-    # Grid
-    facet_wrap(~ Ability, labeller = labeller(Ability = nt.labs)) +
-    
-    # Theme adjustments
-    theme_bw(base_size = 15) +  # Set base font size
-    theme(
-      axis.title.x = element_text(size = 18, face = "bold"),  # Increase x-axis title size
-      axis.title.y = element_text(size = 18, face = "bold"),  # Increase y-axis title size
-      axis.text.x = element_text(size = 18),  # Increase x-axis text size
-      axis.text.y = element_text(size = 16),  # Increase y-axis text size
-      legend.text = element_text(size = 16),  # Legend text size
-      panel.grid.major = element_blank(),  # Remove major grid lines
-      panel.grid.minor = element_blank(),  # Remove minor grid lines
-      plot.margin = margin(10, 10, 10, 10),  # Add space around the plot
-      strip.background = element_rect(fill = "white")
-    ) +
-    ylim(c(-0.05,0.52))
-    #ggtitle(paste0("",nt.labs[natural_talents]))
-  
-  
-  # Save the plot
-  ggsave(paste0("plots/",natural_talents,"_MI.png"), width = 13, height = 6, dpi = 300)
+  }, mc.cores=3) # end of natural_talents loop
 
 
-} # end of natural_talents loop
+
+}
+
+
+
+
+
 

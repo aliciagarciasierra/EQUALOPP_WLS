@@ -14,10 +14,10 @@ source("00_MASTER.R")
 outcomes <- "education"   # OUTCOMES is defined in 00_MASTER.R
 
 # Bootstrapping:
-n_boot <- 10
+n_boot <- 100
 
 # Number of imputed datasets:
-m <- 25
+m <- 20
 
 
 
@@ -58,13 +58,14 @@ sapply(outcomes, function(outcome) {
 
 
 ######  Run for both PGIs and observed abilities:
-for (natural_talents in NT) {
+
+for (outcome in outcomes) {
   
-  ######  Run for each outcome:
-  for (outcome in outcomes) {
+  # Run for both PGIs and observed abilities:
+  mclapply(NT, function(natural_talents) {
     
     ###### Run for each sex:
-    for (which_sex in c(0,1)) {
+    lapply(c(0,1), function(which_sex) {
       
       # ------- set label
       sex_lab <- ifelse(which_sex==0,"Brothers","Sisters")
@@ -91,10 +92,6 @@ for (natural_talents in NT) {
           select(-sex)
       })
       
-      # check sample size and families
-      data_example <- data_list[[1]]
-      n_distinct(data_example$ID)
-      n_distinct(data_example$familyID)
       
       # ------- scale numeric variables
       data_list <- lapply(data_list, function(df) {
@@ -233,15 +230,13 @@ for (natural_talents in NT) {
       
     
       
-    } # end of sex loop
+    }) # end of sex loop
     
-    
-  } # end of outcomes loop
-  
-  
-} # end of natural_talents loop
+
+  },mc.cores=3) # end of natural_talents loop
 
 
+} # end of outcomes loop
 
 
 
@@ -294,27 +289,28 @@ ggplot(ci_summary, aes(x = Outcome, y = Estimate, fill = Index)) +
   # Grid
   facet_grid(sex ~ ability, labeller = labeller(ability = nt.labs)) +
   
-  # Labels
-  scale_fill_discrete("", labels = INDICES.labs) +
+  # Customize legend
+  guides(fill = guide_legend(title = NULL)) +
   
   # Theme
-  theme_bw(base_size = 20) +
+  theme_minimal(base_size = 20) +
   theme(
     legend.text=element_text(size=15),
     axis.text.x = element_blank(), 
     axis.ticks.x = element_blank(),
     panel.grid.minor = element_blank(),
-    strip.background = element_rect(fill = "white"),  # Updated here
-    #strip.text = element_text(size = 14),
-    legend.margin = margin(t = -15),
-    plot.margin = margin(b = 1),
+    panel.grid.major.x = element_blank(),
     legend.position = "bottom",    
   ) +
-  ylim(c(0, 0.65))
+  ylim(c(0, 0.65)) +
+  
+  # Color scale
+  scale_fill_manual(labels = INDICES.labs, values=c("#FDE725FF", "#5DC863FF", "#5287EB"))
+
 
 
 # Save the plot
-ggsave(paste0("plots/EducationWLSgender.png"), width = 8, height = 8)
+ggsave(paste0("plots/education_gender_MI_WLS.jpeg"), width = 8, height = 8)
 
 
 

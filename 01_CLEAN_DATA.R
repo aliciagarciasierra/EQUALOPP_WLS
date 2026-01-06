@@ -14,15 +14,12 @@ outcome_vars   <- OUTCOMES    # OUTCOMES is defined in 00_MASTER.R
 health_vars <- c("health_self", "health_illness", "health_hospital")
 if ("health_pc" %in% outcome_vars) outcome_vars <- c(outcome_vars, health_vars)
 
+
 # Imputation:
 impute         <- T
+m              <- 20
+maxit          <- 10
 
-m              <- 2
-maxit          <- 5
-
-# Filters:
-age_filter     <- F
-outlier_filter <- F
 
 
 
@@ -139,88 +136,18 @@ select(data, contains("age_w")) %>% summary()
 # Mean   :53.66   Mean   :64.66   Mean   :71.66   Mean   : 80.66  
 # Max.   :75.00   Max.   :86.00   Max.   :93.00   Max.   :102.00  
 
-
-
-
-
-########################## PERCENTILE INCOME RANK ######################################
-
-#select(data, contains("income_")) %>% summary()
-#
-#data <- data %>%
-#  mutate(across(matches("income_"), ~ percent_rank(.) * 100))
-#
-#select(data, contains("income_")) %>% summary()
-
-
-########################## AGE FILTER ######################################
-
-if (age_filter) {
-  min_income = 45
-  max_income = 65
-  
-  min_wealth = 55
-  max_wealth = 70
-  
-  min_health = 50
-  max_health = 65
-  
-  # Years between waves
-  delta45 <- 11
-  delta56 <- 7
-  delta67 <- 9
-  
-  # Average over waves for relevant years
-  data <- data %>% mutate(
-    grades      = grades_1,
-    education   = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
-    occupation  = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
-    income      = case_when(age_w5 >= min_income          & age_w5 <= (max_income-delta56) ~ rowMeans(select(., income_ind_5, income_ind_6), na.rm=TRUE),
-                            age_w5 > (max_income-delta56) & age_w5 <= max_income           ~ income_ind_5,
-                            age_w6 >= min_income          & age_w6 <= max_income           ~ income_ind_6,
-                            ),
-    wealth      = case_when(age_w4 >= min_wealth          & age_w4 <= (max_wealth-delta45) ~ rowMeans(select(., wealth_4, wealth_5), na.rm=TRUE),
-                            age_w4 > (max_wealth-delta45) & age_w4 <= max_wealth           ~ wealth_4,
-                            age_w5 >= min_wealth          & age_w5 <= (max_wealth-delta56) ~ rowMeans(select(., wealth_5, wealth_6), na.rm=TRUE),
-                            age_w5 > (max_wealth-delta56) & age_w5 <= max_wealth           ~ wealth_5,
-                            age_w6 >= min_wealth          & age_w6 <= max_wealth           ~ wealth_6
-                            ),
-    health_self = case_when(age_w4 >= min_health          & age_w4 <= (max_health-delta45) ~ rowMeans(select(., health_self_4, health_self_5), na.rm=TRUE),
-                            age_w4 > (max_health-delta45) & age_w4 <=  max_health          ~ health_self_4,
-                            age_w5 >= min_health          & age_w5 <= (max_health-delta56) ~ rowMeans(select(., health_self_5, health_self_6), na.rm=TRUE),
-                            age_w5 > (max_health-delta56) & age_w5 <=  max_health          ~ health_self_5,
-                            age_w6 >= min_health          & age_w6 <= (max_health-delta67) ~ rowMeans(select(., health_self_6, health_self_7), na.rm=TRUE),
-                            age_w6 > (max_health-delta67) & age_w6 <=  max_health          ~ health_self_6,
-                            age_w7 >= min_health          & age_w7 <=  max_health          ~ health_self_7
-                            ),
-    health_illness = case_when(age_w4 >= min_health       & age_w4 <= (max_health-delta45) ~ rowMeans(select(., health_illness_4, health_illness_5), na.rm=TRUE),
-                            age_w4 > (max_health-delta45) & age_w4 <=  max_health          ~ health_illness_4,
-                            age_w5 >= min_health          & age_w5 <= (max_health-delta56) ~ rowMeans(select(., health_illness_5, health_illness_6), na.rm=TRUE),
-                            age_w5 > (max_health-delta56) & age_w5 <=  max_health          ~ health_illness_5,
-                            age_w6 >= min_health          & age_w6 <=  max_health          ~ health_illness_6
-                            ),
-    health_hospital = case_when(age_w4 >= min_health      & age_w4 <= (max_health-delta45) ~ rowMeans(select(., health_hospital_4, health_hospital_5), na.rm=TRUE),
-                            age_w4 > (max_health-delta45) & age_w4 <=  max_health          ~ health_hospital_4,
-                            age_w5 >= min_health          & age_w5 <=  max_health          ~ health_hospital_5
-                            )
+# Average over all available waves
+data <- data %>%
+  mutate(
+    grades          = grades_1,
+    education       = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
+    occupation      = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
+    income          = rowMeans(select(., all_of(names(INC_IND))),     na.rm=TRUE),
+    wealth          = rowMeans(select(., all_of(names(WEALTH))),      na.rm=TRUE),
+    health_self     = rowMeans(select(., all_of(names(HEALTH_S))),    na.rm=TRUE),
+    health_illness  = rowMeans(select(., all_of(names(HEALTH_ILL))),  na.rm=TRUE),
+    health_hospital = rowMeans(select(., all_of(names(HEALTH_HOSP))), na.rm=TRUE)
   )
-  
-} else {
-  
-  # Average over all available waves
-  data <- data %>%
-    mutate(
-      grades          = grades_1,
-      education       = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
-      occupation      = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
-      income          = rowMeans(select(., all_of(names(INC_IND))),     na.rm=TRUE),
-      wealth          = rowMeans(select(., all_of(names(WEALTH))),      na.rm=TRUE),
-      health_self     = rowMeans(select(., all_of(names(HEALTH_S))),    na.rm=TRUE),
-      health_illness  = rowMeans(select(., all_of(names(HEALTH_ILL))),  na.rm=TRUE),
-      health_hospital = rowMeans(select(., all_of(names(HEALTH_HOSP))), na.rm=TRUE)
-      )
-
-}
 
 summary(select(data, any_of(OUTCOMES_full)))
 
@@ -302,35 +229,35 @@ summary(select(data, IQ, centile_rank_IQ))
 
 ########################## OBSERVED ABILITY non-cognitive ##########################
 
-# check valids
-valid_summary <- data %>%
-  summarise(
-    valid_extra_1 = sum(!is.na(z_rh001rec)), # collected by phone
-    valid_openn_1 = sum(!is.na(z_rh003rec)), # collected by phone
-    valid_neuro_1 = sum(!is.na(z_rh005rec)), # collected by phone
-    valid_consc_1 = sum(!is.na(z_rh007rec)), # collected by phone
-    valid_agree_1 = sum(!is.na(z_rh009rec)), # collected by phone
-    
-    valid_extra_2 = sum(!is.na(z_mh001rec)), # collected by mail
-    valid_openn_2 = sum(!is.na(z_mh032rec)), # collected by mail
-    valid_neuro_2 = sum(!is.na(z_mh025rec)), # collected by mail
-    valid_consc_2 = sum(!is.na(z_mh017rec)), # collected by mail
-    valid_agree_2 = sum(!is.na(z_mh009rec))  # collected by mail
-  )
-
-valid_summary 
-
-# Rename
-data <- data %>% rename(extraversion      = z_rh001rec, openness      = z_rh003rec, neuroticism = z_rh005rec, 
-                        conscientiousness = z_rh007rec, agreeableness = z_rh009rec)
-
-# Clean (sending negative values to NA)
-data <- data %>%
-  mutate_at(vars(any_of(OBSERVED_NON_COG)),
-            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
-
-# check distributions
-summary(select(data, any_of(OBSERVED_NON_COG)))
+## check valids
+#valid_summary <- data %>%
+#  summarise(
+#    valid_extra_1 = sum(!is.na(z_rh001rec)), # collected by phone
+#    valid_openn_1 = sum(!is.na(z_rh003rec)), # collected by phone
+#    valid_neuro_1 = sum(!is.na(z_rh005rec)), # collected by phone
+#    valid_consc_1 = sum(!is.na(z_rh007rec)), # collected by phone
+#    valid_agree_1 = sum(!is.na(z_rh009rec)), # collected by phone
+#    
+#    valid_extra_2 = sum(!is.na(z_mh001rec)), # collected by mail
+#    valid_openn_2 = sum(!is.na(z_mh032rec)), # collected by mail
+#    valid_neuro_2 = sum(!is.na(z_mh025rec)), # collected by mail
+#    valid_consc_2 = sum(!is.na(z_mh017rec)), # collected by mail
+#    valid_agree_2 = sum(!is.na(z_mh009rec))  # collected by mail
+#  )
+#
+#valid_summary 
+#
+## Rename
+#data <- data %>% rename(extraversion      = z_rh001rec, openness      = z_rh003rec, neuroticism = z_rh005rec, 
+#                        conscientiousness = z_rh007rec, agreeableness = z_rh009rec)
+#
+## Clean (sending negative values to NA)
+#data <- data %>%
+#  mutate_at(vars(any_of(OBSERVED_NON_COG)),
+#            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
+#
+## check distributions
+#summary(select(data, any_of(OBSERVED_NON_COG)))
 
 
 
@@ -350,9 +277,10 @@ siblings <- data %>%
           any_of(ASCRIBED),                              # demographics 
           any_of(outcome_vars),                          # outcomes
           any_of(PGI_COG),                               # PGIs cog
-          any_of(PGI_NON_COG),                           # PGIs noncog
+          #any_of(PGI_NON_COG),                           # PGIs noncog
           all_of(PC_COG),                                # principal components
-          any_of(OBSERVED_COG), any_of(OBSERVED_NON_COG), # observed abilities
+          any_of(OBSERVED_COG), 
+          #any_of(OBSERVED_NON_COG), # observed abilities
       )
 
 # Label NAs rightly
@@ -519,31 +447,8 @@ data_list <- lapply(data_list, na.omit)
 
 
 
-########################## REMOVE OUTLIERS ##########################
 
-
-
-if (outlier_filter) {
-
-  data_list <- lapply(data_list, function(dataset) {
-    
-    # Wealth
-    OutVals = boxplot(dataset$wealth)$out
-    out_wealth <- which(dataset$wealth %in% OutVals)
-    
-    # Income
-    OutVals = boxplot(dataset$income)$out
-    out_income <- which(dataset$income %in% OutVals)
-    
-    dataset %>% filter(row_number() %!in% c(out_wealth, out_income))
-    
-  })
-
-}
-
-
-
-########################## KEEP ONLY TWO-SIBLINGS FAMILIES  ##########################
+########################## KEEP ONLY FAMILIES OF AT LEAST TWO-SIBLINGS ##########################
 
 # Apply the filtering process to each dataset in the data_list list
 data_list <- lapply(data_list, function(dataset) {
@@ -572,7 +477,6 @@ summary(n_siblings_first_dataset$count) # only 2
 
 
 
-
 ########################## SAVE ALL THE IMPUTED DATSETS  ##########################
 
 # Check number of observations
@@ -596,6 +500,7 @@ if (impute) {
 
 print("your data is ready!")
 
+# Save data
 lapply(outcome_vars, function(outcome) {
   saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,"_MI.rds"))
 })

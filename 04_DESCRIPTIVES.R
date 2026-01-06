@@ -18,17 +18,17 @@ data_list <- readRDS(paste0("data/final_datasets_",outcome,".rds"))
 variables_of_interest <- c(
   get("OUTCOMES"),
   get("ASCRIBED"),
-  get("OBSERVED_NON_COG"),
+  #get("OBSERVED_NON_COG"),
   get("OBSERVED_COG"),
-  get("PGI_COG"),
-  get("PGI_NON_COG")
+  #get("PGI_NON_COG"),
+  get("PGI_COG")
 )
 
 # Check the resulting list
 print(variables_of_interest)
 
 # Filter the dataset to include only the variables of interest
-descriptive_stats <- siblings %>%
+descriptive_stats <- data_list %>%
   select(all_of(variables_of_interest)) %>%
   summarise(across(everything(), list(
     mean = ~ mean(.x, na.rm = TRUE),
@@ -149,7 +149,8 @@ wide_df_1 <- wide_df %>%
          Estimate_Sibcorr, SE_Sibcorr, 
          Estimate_IOLIB,   SE_IOLIB,
          Estimate_IORAD,   SE_IORAD,
-         Estimate_diff, pval) 
+         Estimate_diff, pval) #%>%
+  #mutate(across(where(is.numeric), \(x) round(x, 2)))
 
 
 
@@ -216,8 +217,8 @@ all <- bind_rows(select(wide_df_1,pval,id), select(wide_df_2,pval,id))
 
 # Correct p-values and add stars
 all <- all %>% 
-  mutate(corr_pval = p.adjust(pval, method = "holm"),
-         stars     = add_stars(corr_pval)) %>% select(-pval)
+  mutate(corr_pval = p.adjust(pval, method = "BH"),
+         stars     = add_stars(pval)) %>% select(-pval)
 
 # Merge again with original tables
 wide_df_1 <- merge(wide_df_1, all, by="id")
@@ -244,7 +245,12 @@ latex_table <- wide_df_2 %>%
 latex_table
 
 
+# --- Display for word
 
+wide_df_1 <- wide_df_1 %>% mutate(across(where(is.numeric), \(x) round(x, 2)))
+
+
+wide_df_2 <- wide_df_2 %>% mutate(across(where(is.numeric), \(x) round(x, 2)))
 
 
 ####################################################################

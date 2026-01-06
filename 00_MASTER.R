@@ -44,6 +44,8 @@ suppressPackageStartupMessages({
   library(parallel)
   library(xtable)
   library(glue)
+  library(patchwork)
+  library(viridisLite)
 })
 
 `%!in%` <- function(x, y) !(x %in% y)
@@ -100,6 +102,7 @@ nt.labs = c("PGI"     = "PGIs",
 # - observed
 OBSERVED_NON_COG <- c("extraversion", "openness", "neuroticism", "conscientiousness", "agreeableness")
 OBSERVED_COG     <- "centile_rank_IQ"  # or "IQ"
+OBSERVED <- c(OBSERVED_NON_COG, OBSERVED_COG)
 
 # - pgi
 PGI_COG     <- c("pgi_education", "pgi_cognitive", "pgi_math_ability")
@@ -136,10 +139,9 @@ compute_indexes <- function(outcome, data, natural_talents) {
   famID   <- "+ (1 | familyID)"
   
   # Combine available variables with a + 
-  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% colnames(data)],                 collapse=" + ")
-  pgi_vars     <- paste(PGIs[PGIs %in% colnames(data)],                         collapse=" + ")
-  cog_vars     <- paste(OBSERVED_COG[OBSERVED_COG %in% colnames(data)],         collapse=" + ")
-  noncog_vars  <- paste(OBSERVED_NON_COG[OBSERVED_NON_COG %in% colnames(data)], collapse=" + ")
+  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% colnames(data)], collapse=" + ")
+  pgi_vars     <- paste(PGIs[PGIs %in% colnames(data)],         collapse=" + ")
+  obs_vars     <- paste(OBSERVED[OBSERVED %in% colnames(data)], collapse=" + ")
   
   # Combine variable sets together
   if(natural_talents == "PGI") {
@@ -147,8 +149,8 @@ compute_indexes <- function(outcome, data, natural_talents) {
     m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
     
   } else if(natural_talents == "observed") {
-    m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
-    m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
+    m1_vars <- paste0("(", obs_vars, ")^2")
+    m2_vars <- paste0("(", obs_vars, "+", ascr_vars,")^2")
   }
   
   
@@ -216,8 +218,7 @@ est_fun <- function(data, indices, outcome, natural_talents) {
   # Combine available variables with a + 
   ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% colnames(data)],                 collapse=" + ")
   pgi_vars     <- paste(PGIs[PGIs %in% colnames(data)],                         collapse=" + ")
-  cog_vars     <- paste(OBSERVED_COG[OBSERVED_COG %in% colnames(data)],         collapse=" + ")
-  noncog_vars  <- paste(OBSERVED_NON_COG[OBSERVED_NON_COG %in% colnames(data)], collapse=" + ")
+  obs_vars     <- paste(OBSERVED[OBSERVED %in% colnames(data)], collapse=" + ")
   
   # Combine variable sets together
   if(natural_talents == "PGI") {
@@ -225,8 +226,8 @@ est_fun <- function(data, indices, outcome, natural_talents) {
     m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
     
   } else if(natural_talents == "observed") {
-    m1_vars <- paste0("(", cog_vars, "+", noncog_vars,                ")^2")
-    m2_vars <- paste0("(", cog_vars, "+", noncog_vars, "+", ascr_vars,")^2")
+    m1_vars <- paste0("(", obs_vars,                ")^2")
+    m2_vars <- paste0("(", obs_vars, "+", ascr_vars,")^2")
   }
   
   # Subset the data for this bootstrap sample
