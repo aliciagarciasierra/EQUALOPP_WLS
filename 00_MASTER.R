@@ -111,10 +111,6 @@ PGIs        <- c(PGI_COG, PGI_NON_COG)
 PC_COG      <- paste0("pc", 1:10, "cog")
 
 
-# multiple imputation
-m      <- 25
-
-
 
 
 
