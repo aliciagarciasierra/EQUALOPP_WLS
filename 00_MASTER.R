@@ -105,13 +105,10 @@ OBSERVED <- c(OBSERVED_NON_COG, OBSERVED_COG)
 PGIs <- c("pgi_education", "pgi_cognitive", 
           "pgi_depression", "pgi_extraversion", "pgi_neuroticism", "pgi_openness",
           "pgi_risk", "pgi_well_being", "pgi_adhd")
-
-
 PC          <- paste0("pc", 1:10)
 
 # Ascribed characteristics
 ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "birth_order", PC)
-
 
 
 
