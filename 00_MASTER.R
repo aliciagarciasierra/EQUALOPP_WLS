@@ -90,9 +90,6 @@ OUTCOMES.labs <- c("education"       = "Education",
                    "health_hospital" = "Health Hospitalizations", 
                    "health_pc"       = "Health")
 
-# Ascribed characteristics
-ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "father_age_birth", "birth_order")
-
 
 # Natural talents
 NT      = c("PGI", "observed")
@@ -104,15 +101,18 @@ OBSERVED_NON_COG <- c("extraversion", "openness", "neuroticism", "conscientiousn
 OBSERVED_COG     <- "centile_rank_IQ"  # or "IQ"
 OBSERVED <- c(OBSERVED_NON_COG, OBSERVED_COG)
 
-# - pgi
-PGI_COG     <- c("pgi_education", "pgi_cognitive", "pgi_math_ability")
-PGI_NON_COG <- c("pgi_depression", "pgi_well_being", "pgi_neuroticism")
-PGIs        <- c(PGI_COG, PGI_NON_COG)
-PC_COG      <- paste0("pc", 1:10, "cog")
+# - pgis
+PGIs <- c("pgi_education", "pgi_cognitive", 
+          "pgi_depression", "pgi_extraversion", "pgi_neuroticism", "pgi_openness",
+          "pgi_risk", "pgi_well_being", "pgi_adhd")
 
 
-# multiple imputation
-m      <- 25
+PC          <- paste0("pc", 1:10)
+
+# Ascribed characteristics
+ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "birth_order", PC)
+
+
 
 
 
@@ -131,6 +131,30 @@ add_stars <- function(p_values) {
 }
 
 
+#-------------- Function to impute parent ages from siblings
+choose_parent_year <- function(parent_by, other_by) {
+  if (all(is.na(parent_by))) return(NA_real_)
+  
+  # parental info per row: does this row know this parent & the other one?
+  info_count <- (!is.na(parent_by)) + (!is.na(other_by))
+  
+  uniq_vals <- unique(na.omit(parent_by))
+  
+  if (length(uniq_vals) == 1) {
+    # no conflict
+    uniq_vals
+  } else {
+    # conflict: pick value from row with most parental info
+    best_idx <- which(
+      !is.na(parent_by) &
+        info_count == max(info_count[!is.na(parent_by)])
+    )[1]
+    parent_by[best_idx]
+  }
+}
+
+
+
 #-------------- Function to compute the main indexes 
 compute_indexes <- function(outcome, data, natural_talents) {
   
@@ -139,9 +163,9 @@ compute_indexes <- function(outcome, data, natural_talents) {
   famID   <- "+ (1 | familyID)"
   
   # Combine available variables with a + 
-  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% colnames(data)], collapse=" + ")
-  pgi_vars     <- paste(PGIs[PGIs %in% colnames(data)],         collapse=" + ")
-  obs_vars     <- paste(OBSERVED[OBSERVED %in% colnames(data)], collapse=" + ")
+  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% names(data)], collapse=" + ")
+  pgi_vars     <- paste(PGIs,     collapse=" + ")
+  obs_vars     <- paste(OBSERVED, collapse=" + ")
   
   # Combine variable sets together
   if(natural_talents == "PGI") {
@@ -151,7 +175,7 @@ compute_indexes <- function(outcome, data, natural_talents) {
   } else if(natural_talents == "observed") {
     m1_vars <- paste0("(", obs_vars, ")^2")
     m2_vars <- paste0("(", obs_vars, "+", ascr_vars,")^2")
-  }
+  } else (print("select a valid definition of natural talents"))
   
   
   # 1) NULL MODEL
@@ -208,27 +232,18 @@ compute_indexes <- function(outcome, data, natural_talents) {
 }
 
 
-#-------------- Function to be bootstrapped
+#-------------- Function to compute Clustered Bootstrapping
 est_fun <- function(data, indices, outcome, natural_talents) {
   
-  # ------- models specifications
-  m0_vars <- "1"
-  famID   <- "+ (1 | familyID)"
+  # Prepare variables
+  famID        <- "+ (1 | familyID)"
+  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% names(data)], collapse=" + ")
+  pgi_vars     <- paste(PGIs,     collapse=" + ")
   
-  # Combine available variables with a + 
-  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% colnames(data)],                 collapse=" + ")
-  pgi_vars     <- paste(PGIs[PGIs %in% colnames(data)],                         collapse=" + ")
-  obs_vars     <- paste(OBSERVED[OBSERVED %in% colnames(data)], collapse=" + ")
-  
-  # Combine variable sets together
-  if(natural_talents == "PGI") {
-    m1_vars <- paste0("(", pgi_vars, ")^2")
-    m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
-    
-  } else if(natural_talents == "observed") {
-    m1_vars <- paste0("(", obs_vars,                ")^2")
-    m2_vars <- paste0("(", obs_vars, "+", ascr_vars,")^2")
-  }
+  # Prepare formulas
+  m0_vars      <- "1"
+  m1_vars <- paste0("(", pgi_vars, ")^2")
+  m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
   
   # Subset the data for this bootstrap sample
   data_sample <- data[indices, ]
@@ -271,5 +286,55 @@ est_fun <- function(data, indices, outcome, natural_talents) {
   return(c(Sibcorr, IOLIB, IORAD))
 }
 
+
+
+
+# ------- Function to compute estimates and CIs of indices
+compute_indexes_bootstrap <- function(dataset, n_boot, outcome) {
+  
+  # Run bootstrapping
+  bootstrap_results <- boot(data            = dataset, 
+                            statistic       = est_fun, 
+                            outcome         = outcome,
+                            R               = n_boot,
+                            natural_talents = natural_talents
+  )
+  
+  # Boot runs: rename
+  boot_estimates <- data.frame(bootstrap_results$t)
+  names(boot_estimates) <- INDICES
+  
+  # Point estimates: rename
+  point_estimates <- data.frame(t(bootstrap_results$t0))
+  names(point_estimates) <- INDICES
+  
+  # Add IOP difference
+  boot_estimates  <- boot_estimates %>% mutate(diff=IORAD-IOLIB)
+  point_estimates <- point_estimates %>% mutate(diff=IORAD-IOLIB)
+  
+  # Calculate SE and CI for each Index
+  results <- map_df(names(boot_estimates), function(index) {
+    
+    # Estimates
+    boots = boot_estimates[[index]]
+    value = point_estimates[[index]] 
+    
+    # SE and CI
+    se_boot <- sd(boots)
+    CI    = quantile(boots, c(.025, .975))
+    
+    # one-sided p-value for H0: value <= 0, H1: value > 0
+    z     <- value / se_boot
+    p_val <- 1 - pnorm(z)
+    
+    # results
+    data.frame("Index"=index,        "Outcome"=outcome,     "Estimate"=value, 
+               "Lower"=CI[["2.5%"]], "Upper"=CI[["97.5%"]], "pval"=p_val,
+               "N"    = nrow(dataset))
+  })
+  
+  return(results)
+  
+}
 
 

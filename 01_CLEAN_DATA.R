@@ -1,7 +1,6 @@
 #####################################################################
 ###################### DATA CLEANING AND RESHAPING #################
 #####################################################################
-
 source("00_MASTER.R")
 
 
@@ -16,18 +15,15 @@ if ("health_pc" %in% outcome_vars) outcome_vars <- c(outcome_vars, health_vars)
 
 
 # Imputation:
-impute         <- T
-m              <- 20
+impute         <- F
+m              <- 10
 maxit          <- 10
 
 
 
+# Read full data
+data <- readRDS("data/data.rds")
 
-# FAST READ FROM RDS  ------------------
-
-data       <- readRDS("data/data.rds")
-pgi_cog    <- readRDS("data/pgi_cog.rds")
-pgi_noncog <- readRDS("data/pgi_noncog.rds")
 
 print("finished reading raw data.")
 
@@ -68,8 +64,49 @@ data <- data %>%
     birth_year        = ifelse(birth_year < 0, NA, birth_year),
     sex               = case_when(sex == 1 ~ 0, sex == 2 ~ 1, TRUE ~ NA_real_ )) %>% 
   mutate(
-    mother_age_birth = birth_year- birth_year_mother,
-    father_age_birth = birth_year- birth_year_father)
+    mother_age_birth = birth_year - birth_year_mother,
+    father_age_birth = birth_year - birth_year_father)
+
+
+
+# TEST: impute parental ages from other sibling =========
+
+data <- data %>%
+  group_by(familyID) %>%
+  mutate(
+    # 1) canonical parent birth years within family
+    mother_birth_year_family = choose_parent_year(birth_year_mother, birth_year_father),
+    father_birth_year_family = choose_parent_year(birth_year_father, birth_year_mother),
+    
+    # 2) overwrite birth years with canonical ones (if we have them)
+    birth_year_mother = ifelse(
+      !is.na(mother_birth_year_family),
+      mother_birth_year_family,
+      birth_year_mother
+    ),
+    birth_year_father = ifelse(
+      !is.na(father_birth_year_family),
+      father_birth_year_family,
+      birth_year_father
+    ),
+    
+    # 3) recompute ages at birth from canonical birth years
+    mother_age_birth = ifelse(
+      !is.na(mother_birth_year_family),
+      birth_year - mother_birth_year_family,
+      mother_age_birth
+    ),
+    father_age_birth = ifelse(
+      !is.na(father_birth_year_family),
+      birth_year - father_birth_year_family,
+      father_age_birth
+    )
+  ) %>%
+  ungroup() %>%
+  select(-mother_birth_year_family, -father_birth_year_family)
+
+# ==========
+
 
 
 #----- Birth order
@@ -155,76 +192,115 @@ summary(select(data, any_of(OUTCOMES_full)))
 
 ########################## PGIs cognitive ######################################
 
-# Relabel and select the variables of interest
-pgi_cog<- pgi_cog %>%
-  mutate(
-    pgiID = paste(idpub,rtype, sep = "_")
-  )%>%
-  select(
-    pgiID,
-    pgi_education = pgs_ea3_gwas,
-    pgi_cognitive = pgs_cp_gwas,
-    pgi_math_exam = pgs_hm_mtag,
-    pgi_math_ability = pgs_ma_mtag,
-    pc1cog = pc1_shuffled,
-    pc2cog = pc2_shuffled,
-    pc3cog = pc3_shuffled,
-    pc4cog = pc4_shuffled,
-    pc5cog = pc5_shuffled,
-    pc6cog = pc6_shuffled,
-    pc7cog = pc7_shuffled,
-    pc8cog = pc8_shuffled,
-    pc9cog = pc9_shuffled,
-    pc10cog = pc10_shuffled
-  )
-
-# Merge with main data
-
-data <-merge(data, pgi_cog, by="pgiID", all.y=TRUE)
-
-
+#pgi_cog <- readRDS("data/pgi_cog.rds")
+#
+## Relabel and select the variables of interest
+#pgi_cog <- pgi_cog %>%
+#  mutate(
+#    pgiID = paste(idpub,rtype, sep = "_")
+#  )%>%
+#  select(
+#    pgiID,
+#    pgi_education = pgs_ea3_gwas,
+#    pgi_cognitive = pgs_cp_gwas,
+#    #pgi_math_exam = pgs_hm_mtag,
+#    pgi_math_ability = pgs_ma_mtag,
+#    pc1 = pc1_shuffled,
+#    pc2 = pc2_shuffled,
+#    pc3 = pc3_shuffled,
+#    pc4 = pc4_shuffled,
+#    pc5 = pc5_shuffled,
+#    pc6 = pc6_shuffled,
+#    pc7 = pc7_shuffled,
+#    pc8 = pc8_shuffled,
+#    pc9 = pc9_shuffled,
+#    pc10 = pc10_shuffled
+#  )
+#
+## Merge with main data
+#data <- merge(data, pgi_cog, by="pgiID", all.y=TRUE)
+#
+#
 ########################## PGIs non-cognitive ######################################
+#
+#pgi_noncog <- readRDS("data/pgi_noncog.rds")
+#
+## Relabel and select the variables of interest
+#pgi_noncog<- pgi_noncog %>%
+#  mutate(
+#    pgiID = paste(idpub,rtype, sep = "_")
+#  )%>%
+#  select(
+#    pgiID,
+#    pgi_depression  = pgs_dep_gwas,
+#    pgi_neuroticism = pgs_neur_gwas,
+#    pgi_well_being = pgs_swb_gwas
+#  )
+#
+## Merge with main data
+#
+#data <-merge(data, pgi_noncog, by="pgiID", all.y=TRUE)
 
-# Relabel and select the variables of interest
-pgi_noncog<- pgi_noncog %>%
+
+
+
+########################## PGIs ######################################
+
+# read
+pgi <- read_dta("data/PGIrepo_v1.1_idpub_shuffled.dta")
+
+# select and rename
+pgi <- pgi %>%
   mutate(
     pgiID = paste(idpub,rtype, sep = "_")
   )%>%
   select(
     pgiID,
-    pgi_depression = pgs_dep_gwas,
-    pgi_neuroticism = pgs_neur_gwas,
-    pgi_well_being = pgs_swb_gwas
+    pgi_education = pgi_easingle,
+    pgi_cognitive = pgi_cpsingle,
+    pgi_reading = pgi_readingsingle,
+    pgi_math_ability = pgi_highmathsingle,
+    pgi_depression = pgi_depsingle,
+    pgi_extraversion = pgi_extrasingle,
+    pgi_neuroticism = pgi_neurosingle,
+    pgi_openness = pgi_opensingle,
+    pgi_adventure = pgi_adventuresingle,
+    pgi_risk = pgi_risksingle,
+    pgi_well_being = pgi_swbsingle,
+    pgi_adhd = pgi_adhdsingle,
+    contains("_PGI_shuffled")
   )
 
-# Merge with main data
+# rename pcs
+names(pgi) <- str_replace(names(pgi), "_PGI_shuffled","")
 
-data <-merge(data, pgi_noncog, by="pgiID", all.y=TRUE)
+# Merge with main data
+data <-merge(data, pgi, by="pgiID", all.y=TRUE)
 
 
 ########################## OBSERVED ABILITY cognitive ##########################
 
-# check valids
-valid_summary <- data %>%
-  summarise(
-    total_cognition_grad_4 = sum(!is.na(ri001re)), # 
-    total_cognition_sib_4  = sum(!is.na(si001re)), # 
-    cog_test               = sum(!is.na(z_gwiiq_bm)), # Adolescent cognitive test score
-    centile_rank_cog_test  = sum(!is.na(z_ghncr_bm)), # Centile rank based on national test takers for Henmon-Nelson test score from junior year
-    
-  )
-
-valid_summary 
-# Rename
-data <- data %>% rename(IQ = z_gwiiq_bm, centile_rank_IQ = z_ghncr_bm)
-
-# Clean (sending negative values to NA)
-data <- data %>%
-  mutate_at(vars(IQ, centile_rank_IQ),
-            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
-
-# check distributions
-summary(select(data, IQ, centile_rank_IQ))
+## check valids
+#valid_summary <- data %>%
+#  summarise(
+#    total_cognition_grad_4 = sum(!is.na(ri001re)), # 
+#    total_cognition_sib_4  = sum(!is.na(si001re)), # 
+#    cog_test               = sum(!is.na(z_gwiiq_bm)), # Adolescent cognitive test score
+#    centile_rank_cog_test  = sum(!is.na(z_ghncr_bm)), # Centile rank based on national test takers for Henmon-Nelson test score from junior year
+#    
+#  )
+#
+#valid_summary 
+## Rename
+#data <- data %>% rename(IQ = z_gwiiq_bm, centile_rank_IQ = z_ghncr_bm)
+#
+## Clean (sending negative values to NA)
+#data <- data %>%
+#  mutate_at(vars(IQ, centile_rank_IQ),
+#            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
+#
+## check distributions
+#summary(select(data, IQ, centile_rank_IQ))
 
 
 ########################## OBSERVED ABILITY non-cognitive ##########################
@@ -271,16 +347,13 @@ summary(select(data, IQ, centile_rank_IQ))
 ########################## SELECT SAMPLE ##########################
 
 
-# Select each outcome separately
+# Select 
 siblings <- data %>% 
-  select(ID, familyID, withinID, pgiID,                  # IDs
-          any_of(ASCRIBED),                              # demographics 
-          any_of(outcome_vars),                          # outcomes
-          any_of(PGI_COG),                               # PGIs cog
-          #any_of(PGI_NON_COG),                           # PGIs noncog
-          all_of(PC_COG),                                # principal components
-          any_of(OBSERVED_COG), 
-          #any_of(OBSERVED_NON_COG), # observed abilities
+  select(ID, familyID, withinID, pgiID,  # IDs
+          any_of(ASCRIBED),              # demographics 
+          any_of(outcome_vars),          # outcomes
+          contains("pgi_"),                  # PGIs
+          all_of(PC),                    # principal components
       )
 
 # Label NAs rightly
@@ -299,8 +372,16 @@ siblings <- siblings %>%
          withinID = as.character(withinID),
          sex      = as.factor(as.character(sex)))
 
+siblings <- siblings %>% arrange(familyID)
+
 # keep a copy before imputation
 siblings_full <- siblings 
+
+
+
+
+
+
 
 
 ########################## MULTIPLE IMPUTATION  ##########################
@@ -383,12 +464,12 @@ data_list <- if (impute) imputed_datasets_without_y else list(siblings_full)
 # Remove those with unrealistic parental ages
 data_list <- lapply(data_list, function(dataset) {
   dataset %>%
-    filter(mother_age_birth >= 14 & father_age_birth >= 14)
+    filter(mother_age_birth >= 14)
 })
 
 #Check
 first_imputed_dataset <- data_list[[1]]
-summary(first_imputed_dataset$father_age_birth) # works
+summary(first_imputed_dataset$mother_age_birth) # works
 
   
 
@@ -483,16 +564,19 @@ summary(n_siblings_first_dataset$count) # only 2
 first_dataset <- data_list[[1]]
 nrow(first_dataset) # only 2
 
+# Check unique IDs
+stopifnot(nrow(first_dataset)==n_distinct(first_dataset$ID))
+
 # Saving settings
 if (impute) {
  # All imputed datasets
  datafile <- data_list      # save whole list
- dataname <- "final_datasets"
+ impute_lab <- "_MI" 
 } else {
  # Single original dataset
  datalist <- data_list[1]   # access first list level
  datafile <- datalist[[1]]  # access second list level
- dataname <- "siblings"
+ impute_lab <- "" 
 }
 
 
@@ -502,8 +586,10 @@ print("your data is ready!")
 
 # Save data
 lapply(outcome_vars, function(outcome) {
-  saveRDS(datafile, file = paste0("data/",dataname,"_",outcome,"_MI.rds"))
+  saveRDS(datafile, file = paste0("data/siblings_",outcome,impute_lab,".rds"))
 })
+
+
 
 ########################### NUMBER OF OBSERVATIONS ############################
 

@@ -19,17 +19,18 @@ n_boot <- 100
 
 # Number of imputed datasets:
 
-m <- 20
+m <- 10
 
 
 
+NT <- "PGI"
 
 ########################## RUN ####################################
 
 for (outcome in outcomes) {
     
   # Run for both PGIs and observed abilities:
-  mclapply(NT, function(natural_talents) {
+  lapply(NT, function(natural_talents) {
     
     # ------- check
       print(paste0("which talent: ",natural_talents))
@@ -38,9 +39,9 @@ for (outcome in outcomes) {
       
       
       # ------- read data
-      data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
+      data_list <-readRDS(paste0("data/siblings_",outcome,"_MI.rds"))
       
-      <- # ------- scale numeric variables
+      # ------- scale numeric variables
       data_list <- lapply(data_list, function(df) {
         df %>% mutate_if(is.numeric, scale)
       })
@@ -107,7 +108,7 @@ for (outcome in outcomes) {
         # Add column with difference
         point_estimates$diff <- point_estimates$IORAD-point_estimates$IOLIB
         # Write to file
-        saveRDS(point_estimates, paste0("results/all_runs/","Complete_",natural_talents,".rds"))
+        saveRDS(point_estimates, paste0("results/all_runs/","Complete_",natural_talents,"_MI.rds"))
         
         
         # ---- Boot estimates
@@ -180,7 +181,9 @@ for (outcome in outcomes) {
       
   
   
-  }, mc.cores=3) # end of natural_talents loop
+  }
+  #, mc.cores=3
+  ) # end of natural_talents loop
 
 
 
