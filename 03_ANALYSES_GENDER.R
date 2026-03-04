@@ -17,7 +17,7 @@ natural_talents <- "PGI"
 moba_sample     <- "parents"   # "parents" or "children"
 
 # Bootstrapping:
-n_boot <- 1000
+n_boot <- 100
 
 
 

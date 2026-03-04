@@ -10,7 +10,7 @@
 # Data: WLS
 
 # SET WD 
-setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/Projects/GenesSkills/EQUALOPP_WLS")
+setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/UNIL/projects/GenesSkills/EQUALOPP_WLS")
 
 #######################################################
 #########   PREPARE THE ENVIRONMENT ################
@@ -237,9 +237,6 @@ est_fun <- function(data, indices, outcome, natural_talents) {
   m1_vars <- paste0("(", pgi_vars, ")^2")
   m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
   
-  # Subset the data for this bootstrap sample
-  data_sample <- data[indices, ]
-  
   # Cluster re-sampling
   # get family ID of sampled individuals
   sampled_families <- unique(data$familyID)[indices]
@@ -314,13 +311,14 @@ compute_indexes_bootstrap <- function(dataset, n_boot, outcome) {
     # SE and CI
     se_boot <- sd(boots)
     CI    = quantile(boots, c(.025, .975))
-    
+
     # one-sided p-value for H0: value <= 0, H1: value > 0
     z     <- value / se_boot
     p_val <- 1 - pnorm(z)
     
     # results
-    data.frame("Index"=index,        "Outcome"=outcome,     "Estimate"=value, 
+    data.frame("Index"=index,        "Outcome"=outcome,     "Estimate"=value,
+               "SE"   =se_boot,
                "Lower"=CI[["2.5%"]], "Upper"=CI[["97.5%"]], "pval"=p_val,
                "N"    = nrow(dataset))
   })

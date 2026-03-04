@@ -30,7 +30,7 @@ ci_summaryWLS <- readWorkbook(paste0("results/by_outcome/full_results_",outcome,
 
 # Save one combined file per MoBa sample
 for (moba_sample in names(moba_main)) {
-  data <- bind_rows(mutate(moba_main[[moba_sample]], Dataset="MoBa"),
+  data <- bind_rows(mutate(moba_main[[moba_sample]], Dataset="MoBa", SE=(Upper-Lower)/(2*1.96)),
                     mutate(ci_summaryWLS, Dataset="WLS"))
   saveRDS(data, paste0("results/results_",outcome,"_",natural_talents,"_",moba_sample,".rds"))
 }
@@ -73,7 +73,7 @@ ci_summaryWLS <- map_df(c("Brothers","Sisters"), function(sex_lab) {
 
 # Save one combined file per MoBa sample
 for (moba_sample in names(moba_gender)) {
-  data <- bind_rows(mutate(moba_gender[[moba_sample]], Dataset="MoBa"),
+  data <- bind_rows(mutate(moba_gender[[moba_sample]], Dataset="MoBa", SE=(Upper-Lower)/(2*1.96)),
                     mutate(ci_summaryWLS, Dataset="WLS"))
   saveRDS(data, paste0("results/results_",outcome,"_",natural_talents,"_gender_",moba_sample,".rds"))
 }

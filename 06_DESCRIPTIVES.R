@@ -4,7 +4,7 @@
 ################################################################################
 
 
-setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/Projects/GenesSkills/EQUALOPP_WLS")
+setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/UNIL/projects/GenesSkills/EQUALOPP_WLS")
 source("00_MASTER.R")
 
 outcome      <- "education"
@@ -73,10 +73,7 @@ results <- bind_rows(results_all, results_sex)
 results <- results %>% 
   mutate(Sample = factor(Sample,levels=c("Complete","Sisters","Brothers")))
 
-# Compute SE from CIs
-results <- results %>% 
-  mutate(SE = (Upper - Lower) / (2*1.96)) %>% 
-  select(-Upper, -Lower) 
+results <- results %>% select(-Upper, -Lower)
 
 
 # Extract p-values and adjust
