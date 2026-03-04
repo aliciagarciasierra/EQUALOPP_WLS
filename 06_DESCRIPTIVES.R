@@ -4,13 +4,13 @@
 ################################################################################
 
 
-
+setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/Projects/GenesSkills/EQUALOPP_WLS")
 source("00_MASTER.R")
 
-outcome <- "education"
-data    <- readRDS(paste0("data/siblings_",outcome,".rds"))
+outcome      <- "education"
+moba_sample  <- "parents"   # "parents" or "children"
+data         <- readRDS(paste0("data/siblings_",outcome,".rds"))
 
-table(data$familyID) %>% table()
 
 
 #################################################################
@@ -20,7 +20,8 @@ table(data$familyID) %>% table()
 
 # Filter the dataset to include only the variables of interest
 descriptive_stats <- data %>%
-  select(all_of(OUTCOMES), all_of(ASCRIBED), -contains("pc")) %>%
+  select(all_of(OUTCOMES), all_of(ASCRIBED), -contains("pc"), all_of(PGIs)) %>%
+  mutate_at(PGIs, ~ as.numeric(scale(.))) %>%
   mutate(sex=as.numeric(as.character(sex))) %>%
   summarise(across(everything(), list(
     mean = ~ mean(.x, na.rm = TRUE),
@@ -39,7 +40,7 @@ descriptive_stats_long <- descriptive_stats %>%
   ) %>% pivot_wider(
     names_from = Statistic,
     values_from = Value
-  ) %>% mutate_if(is.numeric, round, 2)
+  ) #%>% mutate_if(is.numeric, round, 2)
 
 # View the result
 print(descriptive_stats_long)
@@ -58,12 +59,12 @@ outcome         <- "education"
 natural_talents <- "PGI"
 
 # -- Complete sample results
-results_all <- readRDS(paste0("results/results_",outcome,"_",natural_talents,".rds")) %>% 
+results_all <- readRDS(paste0("results/results_",outcome,"_",natural_talents,"_",moba_sample,".rds")) %>%
   mutate(Sample = "Complete", Natural_Talents = natural_talents)
 
 # -- Gender results
-results_sex <- readRDS(paste0("results/results_",outcome,"_",natural_talents,"_gender.rds")) %>%
-  rename(Sample = sex, Natural_Talents = ability)
+results_sex <- readRDS(paste0("results/results_",outcome,"_",natural_talents,"_gender_",moba_sample,".rds")) %>%
+  rename(Natural_Talents = ability)
 
 # Combine results
 results <- bind_rows(results_all, results_sex) 
@@ -95,7 +96,7 @@ wide_df <- merge(wide_df, pvalues)
 
 
 # Reorder variables
-wide_df %>% 
+results_table <- wide_df %>% 
   arrange(Dataset, Sample, Natural_Talents) %>%
   select(Dataset, Sample, N, Natural_Talents, 
          Estimate_Sibcorr, SE_Sibcorr, 
@@ -103,6 +104,13 @@ wide_df %>%
          Estimate_IORAD,   SE_IORAD,
          Estimate_diff, pval) %>%
   mutate_if(is.numeric, round, 2)
+
+
+
+
+
+
+
 
 
 

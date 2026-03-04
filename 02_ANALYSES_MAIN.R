@@ -16,7 +16,7 @@ outcome         <- "education"
 natural_talents <- "PGI"
   
 # Bootstrapping iterations:
-n_boot  <- 1000
+n_boot  <- 100
 
 
 
@@ -72,39 +72,6 @@ saveWorkbook(wb, paste0("results/by_outcome/full_results_",outcome,"_",natural_t
  
 
 
-
-
-########################## COMBINE WITH MOBA ####################################
-
-# === MoBa
-
-# Parents
-ci_summaryMoBa <- read.delim(text="Index	Outcome	Estimate	Lower	Upper	pval	N
-Sibcorr	education	0.37420625	0.36016743	0.3898473	0	19514
-IOLIB	education	0.32063291	0.30463092	0.3349338	0	19514
-IORAD	education	0.39904685	0.38562276	0.4130919	0	19514
-diff	education	0.07841393	0.07238116	0.0847985	0	19514", sep = "\t")
-
-# Children
-#ci_summaryMoBa <- read.delim(text="Index	Outcome	Estimate	Lower	Upper	pval	N
-#Sibcorr	education	0.39806344	0.37070421	0.41979626	0	6740
-#IOLIB	education	0.34577913	0.32002460	0.36793881	0	6740
-#IORAD	education	0.43095272	0.40635397	0.45467043	0	6740
-#diff	education	0.08517359	0.07476835	0.09619981	0	6740", sep = "\t") 
-
-
-# === WLS 
-ci_summaryWLS <- readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,".xlsx"), 
-                              sheet = "For plotting") 
-
-
-# Combine 
-data <- bind_rows(mutate(ci_summaryMoBa,Dataset="MoBa"), 
-                  mutate(ci_summaryWLS, Dataset="WLS"))
-
-
-# Save all
-saveRDS(data, paste0("results/results_",outcome,"_",natural_talents,".rds"))
 
 
 

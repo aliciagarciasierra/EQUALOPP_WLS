@@ -157,6 +157,7 @@ data <- data %>%
             ~ ifelse(. < 0, NA, .))
 
 
+
 # Age at each wave
 data <- data %>% mutate(
   age_w4 = 1993 - birth_year,
@@ -177,7 +178,7 @@ select(data, contains("age_w")) %>% summary()
 data <- data %>%
   mutate(
     grades          = grades_1,
-    education       = rowMeans(select(., all_of(names(EDU))),         na.rm=TRUE),
+    education       = pmax(education_1, education_2, education_3, education_4, na.rm=TRUE),
     occupation      = rowMeans(select(., all_of(names(OCCU))),        na.rm=TRUE),
     income          = rowMeans(select(., all_of(names(INC_IND))),     na.rm=TRUE),
     wealth          = rowMeans(select(., all_of(names(WEALTH))),      na.rm=TRUE),
@@ -188,58 +189,6 @@ data <- data %>%
 
 summary(select(data, any_of(OUTCOMES_full)))
 
-
-
-########################## PGIs cognitive ######################################
-
-#pgi_cog <- readRDS("data/pgi_cog.rds")
-#
-## Relabel and select the variables of interest
-#pgi_cog <- pgi_cog %>%
-#  mutate(
-#    pgiID = paste(idpub,rtype, sep = "_")
-#  )%>%
-#  select(
-#    pgiID,
-#    pgi_education = pgs_ea3_gwas,
-#    pgi_cognitive = pgs_cp_gwas,
-#    #pgi_math_exam = pgs_hm_mtag,
-#    pgi_math_ability = pgs_ma_mtag,
-#    pc1 = pc1_shuffled,
-#    pc2 = pc2_shuffled,
-#    pc3 = pc3_shuffled,
-#    pc4 = pc4_shuffled,
-#    pc5 = pc5_shuffled,
-#    pc6 = pc6_shuffled,
-#    pc7 = pc7_shuffled,
-#    pc8 = pc8_shuffled,
-#    pc9 = pc9_shuffled,
-#    pc10 = pc10_shuffled
-#  )
-#
-## Merge with main data
-#data <- merge(data, pgi_cog, by="pgiID", all.y=TRUE)
-#
-#
-########################## PGIs non-cognitive ######################################
-#
-#pgi_noncog <- readRDS("data/pgi_noncog.rds")
-#
-## Relabel and select the variables of interest
-#pgi_noncog<- pgi_noncog %>%
-#  mutate(
-#    pgiID = paste(idpub,rtype, sep = "_")
-#  )%>%
-#  select(
-#    pgiID,
-#    pgi_depression  = pgs_dep_gwas,
-#    pgi_neuroticism = pgs_neur_gwas,
-#    pgi_well_being = pgs_swb_gwas
-#  )
-#
-## Merge with main data
-#
-#data <-merge(data, pgi_noncog, by="pgiID", all.y=TRUE)
 
 
 
@@ -276,71 +225,6 @@ names(pgi) <- str_replace(names(pgi), "_PGI_shuffled","")
 
 # Merge with main data
 data <-merge(data, pgi, by="pgiID", all.y=TRUE)
-
-
-########################## OBSERVED ABILITY cognitive ##########################
-
-## check valids
-#valid_summary <- data %>%
-#  summarise(
-#    total_cognition_grad_4 = sum(!is.na(ri001re)), # 
-#    total_cognition_sib_4  = sum(!is.na(si001re)), # 
-#    cog_test               = sum(!is.na(z_gwiiq_bm)), # Adolescent cognitive test score
-#    centile_rank_cog_test  = sum(!is.na(z_ghncr_bm)), # Centile rank based on national test takers for Henmon-Nelson test score from junior year
-#    
-#  )
-#
-#valid_summary 
-## Rename
-#data <- data %>% rename(IQ = z_gwiiq_bm, centile_rank_IQ = z_ghncr_bm)
-#
-## Clean (sending negative values to NA)
-#data <- data %>%
-#  mutate_at(vars(IQ, centile_rank_IQ),
-#            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
-#
-## check distributions
-#summary(select(data, IQ, centile_rank_IQ))
-
-
-########################## OBSERVED ABILITY non-cognitive ##########################
-
-## check valids
-#valid_summary <- data %>%
-#  summarise(
-#    valid_extra_1 = sum(!is.na(z_rh001rec)), # collected by phone
-#    valid_openn_1 = sum(!is.na(z_rh003rec)), # collected by phone
-#    valid_neuro_1 = sum(!is.na(z_rh005rec)), # collected by phone
-#    valid_consc_1 = sum(!is.na(z_rh007rec)), # collected by phone
-#    valid_agree_1 = sum(!is.na(z_rh009rec)), # collected by phone
-#    
-#    valid_extra_2 = sum(!is.na(z_mh001rec)), # collected by mail
-#    valid_openn_2 = sum(!is.na(z_mh032rec)), # collected by mail
-#    valid_neuro_2 = sum(!is.na(z_mh025rec)), # collected by mail
-#    valid_consc_2 = sum(!is.na(z_mh017rec)), # collected by mail
-#    valid_agree_2 = sum(!is.na(z_mh009rec))  # collected by mail
-#  )
-#
-#valid_summary 
-#
-## Rename
-#data <- data %>% rename(extraversion      = z_rh001rec, openness      = z_rh003rec, neuroticism = z_rh005rec, 
-#                        conscientiousness = z_rh007rec, agreeableness = z_rh009rec)
-#
-## Clean (sending negative values to NA)
-#data <- data %>%
-#  mutate_at(vars(any_of(OBSERVED_NON_COG)),
-#            ~ ifelse(. < 0, NA, .))  # Replace negative values with NA
-#
-## check distributions
-#summary(select(data, any_of(OBSERVED_NON_COG)))
-
-
-
-
-
-
-
 
 
 

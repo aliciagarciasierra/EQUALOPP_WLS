@@ -9,6 +9,8 @@
 
 # Data: WLS
 
+# SET WD 
+setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/Projects/GenesSkills/EQUALOPP_WLS")
 
 #######################################################
 #########   PREPARE THE ENVIRONMENT ################
@@ -50,22 +52,15 @@ suppressPackageStartupMessages({
 
 `%!in%` <- function(x, y) !(x %in% y)
 
-# SET WD 
 
-#setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/EQUALOPP/PROJECT/WLS/EQUALOPP_WLS")
 
 # OPEN RAW DATA (first time)
-
 #data <- read_dta("data/wls_bl_14_03.dta") # main dataset
-#pgi_cog<- read_dta("data/Lee_idpub_shuffled.dta") # PGIs cognitive
-#pgi_noncog <- read_dta("data/Turley_idpub_shuffled.dta") # PGIs non-cognitive
 
 
 # SAVE IN RDA (for faster read following times)
-
 #saveRDS(data, file = "data/data.rds")
-#saveRDS(pgi_cog, file = "data/pgi_cog.rds")
-#saveRDS(pgi_noncog, file = "data/pgi_noncog.rds")
+
 
 
 
