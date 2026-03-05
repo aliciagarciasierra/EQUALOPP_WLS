@@ -45,7 +45,6 @@ descriptive_stats_long <- descriptive_stats %>%
 # View the result
 print(descriptive_stats_long)
 
-write_xlsx(descriptive_stats_long, path = "descriptives.xlsx")
 
 
 

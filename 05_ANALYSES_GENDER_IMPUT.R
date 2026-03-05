@@ -19,6 +19,9 @@ n_boot <- 100
 # Number of imputed datasets:
 m <- 20
 
+# Restrict to PGI (est_fun does not handle observed abilities)
+NT <- "PGI"
+
 
 
 ########################## MODELS ESTIMATION ####################################
@@ -30,7 +33,7 @@ sapply(outcomes, function(outcome) {
   paste(outcome)
   
   # read all
-  data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
+  data_list <-readRDS(paste0("data/siblings_",outcome,"_MI.rds"))
   
   # Loop over sex
   lapply(c(0,1), function(which_sex) {
@@ -81,7 +84,7 @@ for (outcome in outcomes) {
       ########################## MODELS ESTIMATION ####################################
       
       # ------- read data
-      data_list <-readRDS(paste0("data/final_datasets_",outcome,"_MI.rds"))
+      data_list <-readRDS(paste0("data/siblings_",outcome,"_MI.rds"))
       
       # ------- only keep one sex
       data_list <- lapply(data_list, function(df) {
@@ -109,12 +112,11 @@ for (outcome in outcomes) {
       print("Compute main results over imputed datasets")
       
       # ------- Compute indices for multiple datasets and outcomes
-      all_results_list <- lapply(data_list, 
-                                   compute_indexes, 
+      all_results_list <- mclapply(data_list,
+                                   compute_indexes,
                                    outcome = outcome,
-                                   natural_talents = natural_talents#,
-                                   #mc.cores = 4
-                                 )
+                                   natural_talents = natural_talents,
+                                   mc.cores = 4)
       
       
       # ------- Flatten the list of lists into a single data frame
@@ -158,7 +160,7 @@ for (outcome in outcomes) {
         # Add column with difference
         point_estimates$diff <- point_estimates$IORAD-point_estimates$IOLIB
         # Write to file
-        saveRDS(point_estimates, paste0("results/all_runs/",sex_lab,"_",natural_talents,".rds"))
+        saveRDS(point_estimates, paste0("results/all_runs/",sex_lab,"_",natural_talents,"_MI.rds"))
         
         # ---- Boot estimates
         boot_matrices <- lapply(boot_results, function(boot_obj) {
@@ -188,17 +190,19 @@ for (outcome in outcomes) {
           ci_lower <- theta_MI - qt(0.975, df) * sqrt(T_var)
           ci_upper <- theta_MI + qt(0.975, df) * sqrt(T_var)
           
-          # Compute p-value
+          # Compute p-value (one-sided: H0: value <= 0, H1: value > 0)
           t_stat <- theta_MI / sqrt(T_var)
-          p_value <- 2 * pt(-abs(t_stat), df)
-          
+          p_value <- 1 - pt(t_stat, df)
+
           return(data.frame(
             Index    = coef_names[j],
             Outcome  = outcome,
             Estimate = theta_MI,
-            Lower    = ci_lower, 
+            SE       = sqrt(T_var),
+            Lower    = ci_lower,
             Upper    = ci_upper,
-            pval     = p_value
+            pval     = p_value,
+            N        = nrow(data_list[[1]])
           ))
         })
         

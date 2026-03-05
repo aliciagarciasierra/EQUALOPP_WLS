@@ -139,17 +139,19 @@ for (outcome in outcomes) {
           ci_lower <- theta_MI - qt(0.975, df) * sqrt(T_var)
           ci_upper <- theta_MI + qt(0.975, df) * sqrt(T_var)
           
-          # Compute p-value
+          # Compute p-value (one-sided: H0: value <= 0, H1: value > 0)
           t_stat <- theta_MI / sqrt(T_var)
-          p_value <- 2 * pt(-abs(t_stat), df)
-          
+          p_value <- 1 - pt(t_stat, df)
+
           return(data.frame(
             Index    = coef_names[j],
             Outcome  = outcome,
             Estimate = theta_MI,
-            Lower    = ci_lower, 
+            SE       = sqrt(T_var),
+            Lower    = ci_lower,
             Upper    = ci_upper,
-            pval     = p_value
+            pval     = p_value,
+            N        = nrow(data_list[[1]])
           ))
         })
         
