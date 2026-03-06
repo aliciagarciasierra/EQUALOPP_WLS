@@ -16,7 +16,7 @@ outcome         <- "education"
 natural_talents <- "PGI"
   
 # Bootstrapping iterations:
-n_boot  <- 100
+n_boot  <- 1000
 
 
 
