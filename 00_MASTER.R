@@ -98,9 +98,12 @@ OBSERVED <- c(OBSERVED_NON_COG, OBSERVED_COG)
 
 # - pgis
 PGIs <- c("pgi_education", "pgi_cognitive", 
-          "pgi_depression", "pgi_extraversion", "pgi_neuroticism", "pgi_openness",
-          "pgi_risk", "pgi_well_being", "pgi_adhd")
-PC          <- paste0("pc", 1:10)
+          "pgi_extraversion", "pgi_neuroticism", "pgi_openness",
+          "pgi_risk", "pgi_well_being")   # removed: "pgi_depression", "pgi_adhd"
+PGIs.labs <- c("PGI education", "PGI cognitive",
+               "PGI extraversion", "PGI neuroticism", "PGI openness",
+               "PGI risk propensity", "PGI well-being")
+PC   <- paste0("pc", 1:10)
 
 # Ascribed characteristics
 ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "birth_order", PC)
@@ -148,7 +151,7 @@ choose_parent_year <- function(parent_by, other_by) {
 
 
 #-------------- Function to compute the main indexes 
-compute_indexes <- function(outcome, data, natural_talents) {
+compute_indexes <- function(outcome, data, natural_talents, pgis=PGIs) {
   
   # ------- models specifications
   m0_vars <- "1"
@@ -156,13 +159,13 @@ compute_indexes <- function(outcome, data, natural_talents) {
   
   # Combine available variables with a + 
   ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% names(data)], collapse=" + ")
-  pgi_vars     <- paste(PGIs,     collapse=" + ")
+  pgi_vars     <- paste(pgis,     collapse=" + ")
   obs_vars     <- paste(OBSERVED, collapse=" + ")
   
   # Combine variable sets together
   if(natural_talents == "PGI") {
     m1_vars <- paste0("(", pgi_vars, ")^2")
-    m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
+    m2_vars <- paste0("(", pgi_vars, " + ", ascr_vars,")^2")
     
   } else if(natural_talents == "observed") {
     m1_vars <- paste0("(", obs_vars, ")^2")
@@ -225,12 +228,12 @@ compute_indexes <- function(outcome, data, natural_talents) {
 
 
 #-------------- Function to compute Clustered Bootstrapping
-est_fun <- function(data, indices, outcome, natural_talents) {
+est_fun <- function(data, indices, outcome, natural_talents, pgis) {
   
   # Prepare variables
   famID        <- "+ (1 | familyID)"
   ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% names(data)], collapse=" + ")
-  pgi_vars     <- paste(PGIs,     collapse=" + ")
+  pgi_vars     <- paste(pgis,     collapse=" + ")
   
   # Prepare formulas
   m0_vars      <- "1"
@@ -279,14 +282,15 @@ est_fun <- function(data, indices, outcome, natural_talents) {
 
 
 # ------- Function to compute estimates and CIs of indices
-compute_indexes_bootstrap <- function(dataset, n_boot, outcome) {
+compute_indexes_bootstrap <- function(dataset, n_boot, outcome, pgis=PGIs) {
   
   # Run bootstrapping
   bootstrap_results <- boot(data            = dataset, 
                             statistic       = est_fun, 
                             outcome         = outcome,
                             R               = n_boot,
-                            natural_talents = natural_talents
+                            natural_talents = natural_talents,
+                            pgis            = pgis
   )
   
   # Boot runs: rename

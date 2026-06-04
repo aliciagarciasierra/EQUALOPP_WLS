@@ -66,7 +66,7 @@ for (moba_sample in c("parents", "children")) {
     scale_fill_manual(labels = INDICES.labs, values=c("#F0B70F", "#7ABA3A", "#E83B3F"))
 
   # Save
-  ggsave(paste0("plots/",outcome,impute_lab,"_",moba_sample,".png"), width = 10, height = 10)
+  ggsave(paste0("plots/",outcome,impute_lab,"_",moba_sample,".pdf"), width = 10, height = 10)
 
 
 ################### FIGURE: BY GENDER #########################
@@ -119,6 +119,6 @@ for (moba_sample in c("parents", "children")) {
     scale_fill_manual(labels = INDICES.labs, values=c("#F0B70F", "#7ABA3A", "#E83B3F"))
 
   # Save the plot
-  ggsave(paste0("plots/by_gender_",moba_sample,".png"), width = 10, height = 11, dpi = 300)
+  ggsave(paste0("plots/by_gender_",moba_sample,".pdf"), width = 10, height = 11)
 
 } # end loop over moba_sample

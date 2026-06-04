@@ -236,7 +236,7 @@ siblings <- data %>%
   select(ID, familyID, withinID, pgiID,  # IDs
           any_of(ASCRIBED),              # demographics 
           any_of(outcome_vars),          # outcomes
-          contains("pgi_"),                  # PGIs
+          all_of(PGIs),                  # PGIs
           all_of(PC),                    # principal components
       )
 

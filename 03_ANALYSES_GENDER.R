@@ -14,7 +14,6 @@ source("00_MASTER.R")
 # Compute for desired outcome and natural talents
 outcome         <- "education"
 natural_talents <- "PGI"
-moba_sample     <- "parents"   # "parents" or "children"
 
 # Bootstrapping:
 n_boot <- 1000
