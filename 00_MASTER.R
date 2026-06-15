@@ -228,24 +228,21 @@ compute_indexes <- function(outcome, data, natural_talents, pgis=PGIs) {
 
 
 #-------------- Function to compute Clustered Bootstrapping
-est_fun <- function(data, indices, outcome, natural_talents, pgis) {
-  
+est_fun <- function(family_ids, indices, outcome, natural_talents, pgis, full_data) {
+
+  # Cluster re-sampling: indices are family-level, so all siblings travel together
+  sampled_families <- family_ids[indices]
+  data_sample <- full_data[full_data$familyID %in% sampled_families, ]
+
   # Prepare variables
   famID        <- "+ (1 | familyID)"
-  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% names(data)], collapse=" + ")
+  ascr_vars    <- paste(ASCRIBED[ASCRIBED %in% names(data_sample)], collapse=" + ")
   pgi_vars     <- paste(pgis,     collapse=" + ")
-  
+
   # Prepare formulas
   m0_vars      <- "1"
   m1_vars <- paste0("(", pgi_vars, ")^2")
   m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
-  
-  # Cluster re-sampling
-  # get family ID of sampled individuals
-  sampled_families <- unique(data$familyID)[indices]
-  
-  # get the sibling of each sampled individual
-  data_sample <- data[data$familyID %in% sampled_families, ]
   
   # Compute the models and the statistics (similar to compute_indexes function)
   m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
@@ -284,13 +281,14 @@ est_fun <- function(data, indices, outcome, natural_talents, pgis) {
 # ------- Function to compute estimates and CIs of indices
 compute_indexes_bootstrap <- function(dataset, n_boot, outcome, pgis=PGIs) {
   
-  # Run bootstrapping
-  bootstrap_results <- boot(data            = dataset, 
-                            statistic       = est_fun, 
+  # Run bootstrapping — pass unique family IDs so boot() resamples at family level
+  bootstrap_results <- boot(data            = unique(dataset$familyID),
+                            statistic       = est_fun,
                             outcome         = outcome,
                             R               = n_boot,
                             natural_talents = natural_talents,
-                            pgis            = pgis
+                            pgis            = pgis,
+                            full_data       = dataset
   )
   
   # Boot runs: rename
