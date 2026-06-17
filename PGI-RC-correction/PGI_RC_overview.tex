@@ -1,0 +1,336 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+\section{PGI-RC Correction}
+
+\subsection{What the correction does}
+
+The gap \(\text{IORad} - \text{IOLib}\) equals the share of total
+variance attributed to PGI EA. Because the PGI is a noisy proxy for the
+true additive genetic factor \(g^*\), this share is attenuated. The
+correction (Becker et al.~(2021)) rescales it upward using \(\rho > 1\),
+the ratio of true genetic signal to observed PGI signal:
+
+\[\rho = \sqrt{\frac{h^2_\text{SNP}}{R^2_\text{PGI}}} > 1\]
+
+Because our decomposition distinguishes between-family and within-family
+contributions, we need two separate correction factors ---
+\(\rho_\text{between}\) and \(\rho_\text{within}\) --- each computed
+from the corresponding \(h^2\) and \(R^2\) at that level.
+
+
+\subsection{\texorpdfstring{Step 1. External heritability estimates
+(\(h^2\))}{Step 1. External heritability estimates (h\^{}2)}}
+
+We use two scenarios, differing in the source of \(h^2_\text{pop}\).
+Both are for educational attainment measured in years of schooling.
+
+\subsubsection{Scenario A --- Becker et al.~(2021),
+WLS-specific}
+
+\begin{itemize}
+\tightlist
+\item
+  \(h^2_\text{pop} = 0.172\ (\text{SE} = 0.103)\): WLS-specific GREML
+  estimate, Supplement Table 4.
+\item
+  \(h^2_\text{within}\): Becker does not report a within-family
+  estimate. We impute it by scaling Howe's within/total ratio to
+  Becker's larger \(h^2_\text{pop}\), on the assumption that the share
+  of genetic variance transmitted within families is constant across
+  populations:
+\end{itemize}
+
+\[h^2_{\text{within},\text{Becker}} = h^2_{\text{within},\text{Howe}} \times \frac{h^2_{\text{pop},\text{Becker}}}{h^2_{\text{pop},\text{Howe}}} = 0.04 \times \frac{0.172}{0.13} \approx 0.053\]
+
+\begin{itemize}
+\tightlist
+\item
+  \(h^2_\text{between} = h^2_\text{pop} - h^2_\text{within} \approx 0.119\)
+\end{itemize}
+
+\textbf{Modeling choice}: the proportional scaling assumption is not
+testable from the available data. It produces a Becker scenario that is
+internally consistent (within/total ratio matches Howe), but the true
+within-family \(h^2\) for WLS could differ. Using Howe's
+\(h^2_\text{within} = 0.04\) directly would overestimate
+\(h^2_\text{between}\) (since Becker's total is larger), and was
+therefore not used.
+
+\subsubsection{Scenario B --- Howe et al.~(2022), Nature
+Genetics}
+
+The data sources included in the estimations include MoBa (see
+Supplementary Table 1).
+
+\begin{itemize}
+\tightlist
+\item
+  \(h^2_\text{pop} = 0.13\ (95\%\ \text{CI: } 0.12\text{–}0.15)\)
+\item
+  \(h^2_\text{within} = 0.04\ (95\%\ \text{CI: } 0.02\text{–}0.05)\)
+\item
+  \(h^2_\text{between} = h^2_\text{pop} - h^2_\text{within} = 0.09\)
+\end{itemize}
+
+This scenario is internally consistent: both \(h^2\) components come
+from the same study and population. It is the more conservative scenario
+(smaller \(h^2\), smaller correction).
+
+\subsubsection{Additive decomposition}
+
+\(h^2_\text{pop}\) decomposes additively because \(h^2_\text{between}\)
+and \(h^2_\text{within}\) are both fractions of total phenotypic
+variance --- the numerators partition the total genetic variance with
+the same denominator throughout:
+
+\[h^2_\text{pop} = h^2_\text{between} + h^2_\text{within}\]
+
+
+\subsection{\texorpdfstring{Step 2. Estimating \(R^2\) from the
+data}{Step 2. Estimating R\^{}2 from the data}}\label{step-2.-estimating-r2-from-the-data}
+
+We need two \(R^2\) estimates from the WLS sibling sample: one for the
+between-family association between PGI and education, and one for the
+within-family association.
+
+\subsubsection{\texorpdfstring{Between-family
+\(R^2\)}{Between-family R\^{}2}}\label{between-family-r2}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Residualize both education and PGI on
+  \(\text{poly}(\text{birth\_year}, 2) \times \text{sex}\) and the top
+  10 genetic principal components (PCs) (Becker et al.~2021).
+\item
+  Compute family means of both residuals.
+\item
+  Regress mean education residual on mean PGI residual using OLS.
+  \(R^2_\text{between}\) is the \(R^2\) of this regression.
+\end{enumerate}
+
+\subsubsection{\texorpdfstring{Within-family
+\(R^2\)}{Within-family R\^{}2}}\label{within-family-r2}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Residualize both education and PGI on
+  \(\text{poly}(\text{birth\_year}, 2) \times \text{sex}\) only.
+  \textbf{No PCs} are included.
+\item
+  Demean both residuals within each family, isolating within-family
+  variation.
+\item
+  Regress demeaned education on demeaned PGI using OLS.
+  \(R^2_\text{within}\) is the \(R^2\) of this regression.
+\end{enumerate}
+
+\subsubsection{ICC}
+
+We estimate the intraclass correlation (ICC) from an intercept-only
+mixed model, and use it in Step 3 to put \(h^2\) and \(R^2\) on the same
+scale.
+
+\subsubsection{Consistency check}
+
+Because \(R^2_\text{between}\) and \(R^2_\text{within}\) use different
+denominators (between- and within-family variance respectively), they
+combine as a weighted average to give the population-level \(R^2\):
+
+\[R^2_\text{pop} = \text{ICC} \times R^2_\text{between} + (1 - \text{ICC}) \times R^2_\text{within}\]
+
+This differs from the additive \(h^2\) decomposition because \(R^2\)
+components use level-specific denominators while \(h^2\) components all
+use total variance. Becker et al.~report \(R^2_\text{pop} = 0.063\); our
+estimate is \(R^2_\text{pop} = 0.065\).
+
+
+\subsection{\texorpdfstring{Step 3. Computing
+\(\rho\)}{Step 3. Computing \textbackslash rho}}\label{step-3.-computing-rho}
+
+\(h^2_\text{between}\) and \(h^2_\text{within}\) from the literature are
+fractions of \emph{total} phenotypic variance. \(R^2_\text{between}\)
+and \(R^2_\text{within}\) from our data are fractions of \emph{between-}
+and \emph{within-family} variance respectively. We convert \(R^2\) to
+total-variance scale before dividing:
+
+\[\rho_\text{between} = \sqrt{\frac{h^2_\text{between}}{\text{ICC} \times R^2_\text{between}}}, \qquad \rho_\text{within} = \sqrt{\frac{h^2_\text{within}}{(1 - \text{ICC}) \times R^2_\text{within}}}\]
+
+
+\subsection{Step 4. Applying the
+correction}
+
+See \texttt{PGI\_RC\_derivations} for the full derivation.
+
+\subsubsection{Notation}\label{notation}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.4211}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5789}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Symbol
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Definition
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\(\sigma^2(\tau_j')\) & Between-family variance from M2 (conditioning on
+PGI + ascribed) \\
+\(w\) &
+\([\sigma^2(\delta_{ij}^*) - \sigma^2(\delta_{ij}')] / \sigma^2_\text{tot}\)
+--- within-family share explained by ascribed characteristics \\
+\(\Delta_\text{between}\) &
+\([\sigma^2(\tau_j) - \sigma^2(\tau_j^*)] / \sigma^2_\text{tot}\) ---
+observed between-family genetic share \\
+\(\Delta_\text{within}\) &
+\([\sigma^2(\delta_{ij}) - \sigma^2(\delta_{ij}^*)] / \sigma^2_\text{tot}\)
+--- observed within-family genetic share \\
+\(\rho_\text{between}\) &
+\(\sqrt{h^2_\text{between} / (\text{ICC} \times R^2_\text{between})}\) \\
+\(\rho_\text{within}\) &
+\(\sqrt{h^2_\text{within} / ((1 - \text{ICC}) \times R^2_\text{within})}\) \\
+\end{longtable}
+}
+
+\subsubsection{Corrected IOLib}\label{corrected-iolib}
+
+\[\text{IOLib}_\text{RC} = \text{IOLib} - (\rho^2_\text{between} - 1)\,\Delta_\text{between}\]
+
+Since \(\rho_\text{between} > 1\),
+\(\text{IOLib}_\text{RC} < \text{IOLib}\): the noisy PGI left too much
+variance in \(\sigma^2(\tau_j^*)\), over-attributing
+shared-family-environment variance to the liberal measure.
+
+\subsubsection{Corrected IORad}\label{corrected-iorad}
+
+\[\text{IORad}_\text{RC} = \text{Sibcorr} + \rho^2_\text{within}\,\Delta_\text{within} + w\]
+
+Since \(\rho_\text{within} > 1\),
+\(\text{IORad}_\text{RC} > \text{IORad}\): the within-family genetic
+contribution was underestimated.
+
+\subsubsection{Verification}\label{verification}
+
+\[\text{IORad}_\text{RC} - \text{IOLib}_\text{RC} = \rho^2_\text{between}\,\Delta_\text{between} + \rho^2_\text{within}\,\Delta_\text{within}\]
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Methodological notes}\label{methodological-notes}
+
+\textbf{Consider both \(h^2\) scenarios} The two sources (Becker
+vs.~Howe) differ both in population and in method (GREML on WLS
+vs.~within-family design in cohorts including MoBa). For WLS, Becker's
+estimate is sample-specific but has a large SE (0.103) and requires an
+assumption to obtain \(h^2_\text{within}\). Howe's estimate is more
+precisely measured for the within-family component but comes from a
+different population.
+
+\textbf{Uncertainty in estimation.} In the current method the correction
+factors \(\rho_{between}\) and \(\rho_{within}\) are held fixed at their
+full-sample values across iterations. The variance components (and hence
+Δ\_between, Δ\_within, w, Sibcorr) vary across bootstrap samples.
+R²\_between and R²\_within are estimated from the full sample and held
+fixed.
+
+Considerations: First, bootstrap SEs capture sampling variability in the
+variance components but not uncertainty in the external \(h^2\)
+estimates. How to consider this too? Second, \(R^2\) could be recomputed
+on each bootstrap resample. In practice the impact is small:
+\(R^2_{between}\) is estimated from N\_families observations and is more
+stable than the lmer variance components that drive most bootstrap
+variance. In addition, having a single correction factor for reporting
+is clearer conceptually.
+
+\textbf{\(h^2_\text{within}\) scaling for Becker is an assumption.} The
+proportional scaling
+\(h^2_{\text{within},\text{Becker}} = 0.04 \times (0.172/0.13)\) assumes
+the within/total heritability ratio is the same in WLS as in MoBa. The
+alternative --- using Howe's \(h^2_\text{within} = 0.04\) unchanged with
+Becker's \(h^2_\text{pop} = 0.172\) --- would be internally
+inconsistent, artificially inflating \(h^2_\text{between}\).
+
+\subsection{References}\label{references}
+
+\begin{enumerate}
+\def\labelenumi{\Alph{enumi})}
+\tightlist
+\item
+  Becker, Joel, et al.~``Resource profile and user guide of the
+  Polygenic Index Repository.'' Nature human behaviour 5.12 (2021):
+  1744-1758.
+\item
+  Howe, Laurence J., et al.~``Within-sibship genome-wide association
+  analyses decrease bias in estimates of direct genetic effects.''
+  Nature genetics 54.5 (2022): 581-592.
+\end{enumerate}
+
+\end{document}

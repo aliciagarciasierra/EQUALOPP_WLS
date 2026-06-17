@@ -99,7 +99,7 @@ $$\text{IORad}_\text{RC} - \text{IOLib}_\text{RC} = \rho^2_\text{between}\,\Delt
 
 ---
 
-## Scale correction for ρ
+## Scale correction for $\rho$
 
 $h^2_\text{between}$ and $h^2_\text{within}$ from the literature are fractions of **total** phenotypic variance. $R^2_\text{between}$ (from the family-means regression) and $R^2_\text{within}$ (from the within-family demeaned regression) are fractions of **between-** and **within-family** variance respectively. Dividing directly mixes scales. The ICC converts each $R^2$ to the total-variance scale:
 

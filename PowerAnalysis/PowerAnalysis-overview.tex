@@ -1,0 +1,179 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+\section{Power Analysis --- Overview}\label{power-analysis-overview}
+
+\subsection{Reviewer Comment}\label{reviewer-comment}
+
+\begin{quote}
+The manuscript does not include a power analysis or simulation study
+demonstrating that the available sample sizes are adequate for
+recovering variance components of the magnitude of interest, and this
+omission is consequential in at least two respects. First, the
+gender-stratified WLS subsamples are asked to support estimation of
+three multilevel models each containing up to nine PGIs, their pairwise
+interactions with one another, and their interactions with ascribed
+characteristics, a parameter burden that is difficult to reconcile with
+a family-level sample of this size; the standard errors of 0.06 on the
+individual IO estimates for WLS men, large relative to the point
+estimates themselves, are consistent with this concern. Second, and more
+fundamentally, the within-family design mechanically reduces the PGI
+signal available for estimation---within-family PGI variance is smaller
+than between-family variance while the absolute magnitude of measurement
+error remains constant---which implies that greater sample sizes are
+required to achieve equivalent statistical precision compared to a
+between-family design; the manuscript acknowledges this as a measurement
+error issue but does not discuss its implications for power.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Power Analysis}\label{power-analysis}
+
+\subsubsection{Estimands}\label{estimands}
+
+Two quantities are assessed:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{\texttt{delta\_within\ =\ (emptyind\ -\ condind)\ /\ totalvar}}
+  --- within-family variance reduction attributable to PGIs: (m0 → m1).
+  Explicitly addresses the reviewer's concern, but is not related to the
+  full model with all interactions, which is the real threat to power.
+\item
+  \textbf{\texttt{w\ =\ (condind\ -\ completeind)\ /\ totalvar}} ---
+  within-family variance reduction attributable to ascribed
+  characteristics beyond PGIs: (m1 → m2). Hardest detection problem due
+  to the large parameter burden (all PGIs, ascribed, and their
+  interaction).
+\end{enumerate}
+
+\subsubsection{Steps}\label{steps}
+
+\textbf{Step 1 --- Calibrate parameters from observed WLS data} Read
+variance components from estimated models.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lllll@{}}
+\toprule\noalign{}
+Sample & N families & ICC & delta\_within & w\_obs \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Brothers & 473 & 0.377 & 0.038 & 0.008 \\
+Sisters & 612 & 0.373 & 0.033 & 0.025 \\
+\end{longtable}
+}
+
+\textbf{Step 2 --- Data-generating process} Generates synthetic sibling
+datasets with a controlled variance decomposition. Each PGI is split
+into a between-family component (f\_j \textasciitilde{} N(0, 0.5)) and a
+within-family component (w\_ij \textasciitilde{} N(0, 0.5)). PGI
+coefficients are calibrated so that within-family PGI contribution
+equals exactly \texttt{delta\_within}. For \texttt{w}, ascribed
+variables additionally respect their real-world between/within variance
+structure; their coefficients are calibrated so their joint
+within-family contribution equals exactly \texttt{w\_true}. Residual
+variances \texttt{sigma2\_tau} and \texttt{sigma2\_delta} are set to
+reproduce the observed ICC exactly.
+
+\textbf{Step 3 --- Fit models and extract variance components} Fits the
+three-model sequence (m0, m1, m2) via \texttt{lmer}, reproducing the
+paper's full-interaction specification. Extracts \texttt{delta\_within}
+(m0 → m1) and \texttt{w} (m1 → m2).
+
+\textbf{Step 4 --- Null distribution} Runs \texttt{n\_null} replications
+with the estimand set to zero (\texttt{delta\_within\ =\ 0} for
+\texttt{delta\_within}; \texttt{w\_true\ =\ 0} for \texttt{w}) at the
+actual sample size of each subsample. The 95th percentile of the
+resulting distribution is the critical value for a one-sided alpha =
+0.05 test.
+
+\textbf{Step 5 --- Power curve} Loops over an effect size grid at the
+fixed observed N for each sample. For each grid point, runs
+\texttt{n\_sim} replications and records the fraction where the estimate
+exceeds the null critical value.
+
+\textbf{Step 6 --- Plot} Power curve with x-axis = true effect size,
+y-axis = power. A dashed line marks 80\% power; a red dotted line marks
+the observed effect size; a blue dotted line marks the minimum
+detectable effect (linearly interpolated where the curve crosses 80\%).
+
+\subsubsection{Scripts}\label{scripts}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{\texttt{11\_POWER\_d\_simulation.R}} --- power for
+  \texttt{delta\_within}; fits m0 and m1 only (no ascribed variables
+  required)
+\item
+  \textbf{\texttt{12\_POWER\_w\_simulation.R}} --- power for \texttt{w};
+  fits all three models including the full m2 with \textasciitilde210
+  fixed effects
+\end{itemize}
+
+\end{document}

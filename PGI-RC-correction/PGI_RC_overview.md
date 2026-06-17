@@ -26,7 +26,9 @@ $$h^2_{\text{within},\text{Becker}} = h^2_{\text{within},\text{Howe}} \times \fr
 
 **Modeling choice**: the proportional scaling assumption is not testable from the available data. It produces a Becker scenario that is internally consistent (within/total ratio matches Howe), but the true within-family $h^2$ for WLS could differ. Using Howe's $h^2_\text{within} = 0.04$ directly would overestimate $h^2_\text{between}$ (since Becker's total is larger), and was therefore not used.
 
+
 ### Scenario B — Howe et al. (2022), Nature Genetics
+
 
 The data sources included in the estimations include MoBa (see Supplementary Table 1).
 
@@ -130,13 +132,13 @@ $$\text{IORad}_\text{RC} - \text{IOLib}_\text{RC} = \rho^2_\text{between}\,\Delt
 
 **Consider both $h^2$ scenarios** The two sources (Becker vs. Howe) differ both in population and in method (GREML on WLS vs. within-family design in cohorts including MoBa). For WLS, Becker's estimate is sample-specific but has a large SE (0.103) and requires an assumption to obtain $h^2_\text{within}$. Howe's estimate is more precisely measured for the within-family component but comes from a different population.
 
-**Uncertainty in estimation.** Current method:
-- The correction factors ρ_between and ρ_within are held fixed at their full-sample values across iterations
-- The variance components (and hence Δ_between, Δ_within, w, Sibcorr) vary across bootstrap samples
-- R²_between and R²_within are estimated from the full sample and held fixed.
+**Uncertainty in estimation.** In the current method the correction factors  $\rho_{between}$ and $\rho_{within}$ are held fixed at their full-sample values across iterations. The variance components (and hence Δ_between, Δ_within, w, Sibcorr) vary across bootstrap samples. R²_between and R²_within are estimated from the full sample and held fixed.
 
-Considerations:
-- Bootstrap SEs capture sampling variability in the variance components but not uncertainty in the external h² estimates. How to consider this too?
-- R^2 could be recomputed on each bootstrap resample. In practice the impact is small: R²_between is estimated from N_families observations and is more stable than the lmer variance components that drive most bootstrap variance. Moreover, having a single correction factor for reporting is clearer conceptually.
+Considerations: First, bootstrap SEs capture sampling variability in the variance components but not uncertainty in the external $h^2$ estimates. How to consider this too? Second, $R^2$ could be recomputed on each bootstrap resample. In practice the impact is small: $R^2_{between}$ is estimated from N_families observations and is more stable than the lmer variance components that drive most bootstrap variance. In addition, having a single correction factor for reporting is clearer conceptually.
 
 **$h^2_\text{within}$ scaling for Becker is an assumption.** The proportional scaling $h^2_{\text{within},\text{Becker}} = 0.04 \times (0.172/0.13)$ assumes the within/total heritability ratio is the same in WLS as in MoBa. The alternative — using Howe's $h^2_\text{within} = 0.04$ unchanged with Becker's $h^2_\text{pop} = 0.172$ — would be internally inconsistent, artificially inflating $h^2_\text{between}$.
+
+
+## References
+A) Becker, Joel, et al. "Resource profile and user guide of the Polygenic Index Repository." Nature human behaviour 5.12 (2021): 1744-1758.
+B) Howe, Laurence J., et al. "Within-sibship genome-wide association analyses decrease bias in estimates of direct genetic effects." Nature genetics 54.5 (2022): 581-592.

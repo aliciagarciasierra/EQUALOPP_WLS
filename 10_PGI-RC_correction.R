@@ -314,7 +314,7 @@ ggplot(plot_data, aes(x = Outcome, y = Estimate, fill = Index)) +
   scale_y_continuous(limits = c(0, 0.7), expand = expansion(mult = c(0, 0))) +
   scale_fill_manual(labels = INDICES.labs, values = c("#F0B70F", "#7ABA3A", "#E83B3F"))
 
-ggsave(paste0("plots/PGI_RC_correction_WLS.png"), width = 12, height = 8)
+ggsave(paste0("PGI-PC-correction/plots/PGI_RC_correction_WLS.png"), width = 12, height = 8)
 
 
 
@@ -381,6 +381,6 @@ ggplot(check_data, aes(x = Gap, y = Method, colour = Source)) +
   theme(legend.position = "right", panel.grid.minor = element_blank()) +
   xlim(0, max(check_data$Gap) * 1.15)
 
-ggsave(paste0("plots/PGI_RC_gap_check_WLS.png"), 
+ggsave(paste0("PGI-PC-correction/plots/PGI_RC_gap_check_WLS.png"), 
        width = 9, height = 5)
 

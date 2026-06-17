@@ -6,3 +6,17 @@ data/*
 
 .DS_Store
 .Rhistory
+
+# LaTeX auxiliary files
+PGI-RC-correction/*.log
+PGI-RC-correction/*.aux
+PGI-RC-correction/*.out
+PGI-RC-correction/*.toc
+PGI-RC-correction/*.fls
+PGI-RC-correction/*.fdb_latexmk
+PowerAnalysis/*.log
+PowerAnalysis/*.aux
+PowerAnalysis/*.out
+PowerAnalysis/*.toc
+PowerAnalysis/*.fls
+PowerAnalysis/*.fdb_latexmk

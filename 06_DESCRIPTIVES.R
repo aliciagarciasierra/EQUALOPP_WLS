@@ -103,6 +103,107 @@ results_table <- wide_df %>%
 
 
 
+################################################################################
+############### VARIANCE COMPONENT COMPARISON: FULL vs. NO INTERACTIONS #######
+################################################################################
+
+# Reads the "Full results" sheet from both specs for each sample and stacks
+# them into a single table so the two specifications can be compared directly.
+
+files <- list(
+  full = c(
+    Brothers = "results/by_outcome/full_results_education_PGI_Brothers.xlsx",
+    Sisters  = "results/by_outcome/full_results_education_PGI_Sisters.xlsx",
+    Pooled   = "results/by_outcome/full_results_education_PGI.xlsx"
+  ),
+  noint = c(
+    Brothers = "results/by_outcome/full_results_education_PGI_Brothers_nointeractions.xlsx",
+    Sisters  = "results/by_outcome/full_results_education_PGI_Sisters_nointeractions.xlsx",
+    Pooled   = "results/by_outcome/full_results_education_PGI_nointeractions.xlsx"
+  )
+)
+
+read_components <- function(path) {
+  d  <- read.xlsx(path, sheet = "Full results")
+  r1 <- d[d$Model == "NULL MODEL",     ]
+  r3 <- d[d$Model == "COMPLETE MODEL", ]
+  data.frame(
+    Sibcorr      = r1$Sibcorr,
+    delta_within = r1$v - r1$w,
+    w            = r1$w,
+    condcorr     = r1$condcorr,
+    IOLIB        = r1$IOLIB,
+    IORAD        = r3$IORAD
+  )
+}
+
+comp <- lapply(names(files), function(spec) {
+  lapply(names(files[[spec]]), function(samp) {
+    row <- read_components(files[[spec]][[samp]])
+    data.frame(Sample = samp, Spec = spec, row)
+  }) |> do.call(what = rbind)
+}) |> do.call(what = rbind)
+
+comp <- comp |>
+  mutate(across(where(is.numeric), \(x) round(x, 3))) |>
+  arrange(Sample, Spec)
+
+print(comp, row.names = FALSE)
+
+
+################################################################################
+############### PLOT: FULL vs. NO-INTERACTION RESULTS BY SAMPLE ################
+################################################################################
+
+make_sample_plot <- function(spec, title) {
+  plot_data <- lapply(names(files[[spec]]), function(samp) {
+    d <- read.xlsx(files[[spec]][[samp]], sheet = "For plotting")
+    d$Sample <- samp
+    d
+  }) |> do.call(what = rbind)
+
+  plot_data <- plot_data |>
+    filter(Index != "diff") |>
+    mutate(
+      Index    = factor(Index, levels = INDICES),
+      Sample   = factor(Sample, levels = c("Pooled", "Sisters", "Brothers")),
+      Estimate = round(Estimate, 2),
+      Upper    = round(Upper,    2)
+    )
+
+  ggplot(plot_data, aes(x = Sample, y = Estimate, fill = Index)) +
+    geom_col(position = "dodge", width = 0.7) +
+    geom_errorbar(aes(ymin = Lower, ymax = Upper),
+                  position = position_dodge(0.7),
+                  width = 0.25, alpha = 0.9) +
+    geom_text(aes(label = Estimate, y = Upper),
+              position = position_dodge(width = 0.7),
+              vjust = -1, size = 4) +
+    labs(title = title, y = "Inequality of Opportunity in Education\n") +
+    guides(fill = guide_legend(nrow = 1, byrow = FALSE, title = NULL,
+                               keywidth = 1.2, keyheight = 1.2,
+                               default.unit = "cm")) +
+    theme_bw(base_size = 18) +
+    theme(
+      axis.title.x       = element_blank(),
+      panel.grid.minor   = element_blank(),
+      panel.grid.major.x = element_blank(),
+      plot.title         = element_text(size = 16, hjust = 0.5)
+    ) +
+    scale_y_continuous(limits = c(0, 0.6), expand = expansion(mult = c(0, 0))) +
+    scale_fill_manual(labels = INDICES.labs, values = c("#F0B70F", "#7ABA3A", "#E83B3F"))
+}
+
+p_full  <- make_sample_plot("full",  "With interactions")
+p_noint <- make_sample_plot("noint", "Main effects only")
+
+p_full + p_noint + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+
+ggsave("plots/by_sample_full_vs_noint.png", width = 14, height = 8)
+
+
+
 
 
 
