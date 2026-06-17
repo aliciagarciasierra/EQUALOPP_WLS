@@ -1,5 +1,0 @@
-[0] Config.pm:328> INFO - This is Biber 2.21
-[0] Config.pm:331> INFO - Logfile is 'PGI_RC_derivations.blg'
-[83] biber-darwin:342> INFO - === Wed Jun 17, 2026, 09:54:42
-[302] Utils.pm:479> ERROR - Cannot find 'PGI_RC_derivations.bcf'!
-[303] Biber.pm:137> INFO - ERRORS: 1
