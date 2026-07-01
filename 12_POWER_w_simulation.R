@@ -33,10 +33,10 @@ n_pgis <- length(PGIs)
 mean_sib     <- 2
 
 # Where to run analysis
-samples <-  c("Brothers","Sisters")
+samples <-  c("Brothers","Sisters","Pooled")
 
 # Define grid around observed values
-w_grid <- c(0.002, 0.005, 0.008, 0.01, 0.015, 0.02, 0.03, 0.05)
+w_grid <- c(0.002, 0.005, 0.008, 0.01, 0.015, 0.03, 0.05)
 
 
 ######################################################
@@ -284,9 +284,9 @@ if (full_interactions) {
   )
 } else {
   xlsx_lookup <- c(
-    Brothers = "results/by_outcome/full_results_education_PGI_Brothers_nointeractions.xlsx",
-    Sisters  = "results/by_outcome/full_results_education_PGI_Sisters_nointeractions.xlsx",
-    Pooled   = "results/by_outcome/full_results_education_PGI_nointeractions.xlsx"
+    Brothers = "results/nointeractions/full_results_education_PGI_Brothers.xlsx",
+    Sisters  = "results/nointeractions/full_results_education_PGI_Sisters.xlsx",
+    Pooled   = "results/nointeractions/full_results_education_PGI.xlsx"
   )
 }
 # - function to extract values

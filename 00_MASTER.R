@@ -99,11 +99,11 @@ OBSERVED <- c(OBSERVED_NON_COG, OBSERVED_COG)
 # - pgis
 PGIs <- c("pgi_education", "pgi_cognitive", 
           "pgi_extraversion", "pgi_neuroticism", "pgi_openness",
-          "pgi_risk", "pgi_well_being")   # removed: "pgi_depression", "pgi_adhd"
+          "pgi_risk")   # removed: "pgi_depression", "pgi_adhd", "pgi_wellbeing"
 PGIs.labs <- c("PGI education", "PGI cognitive",
                "PGI extraversion", "PGI neuroticism", "PGI openness",
-               "PGI risk propensity", "PGI well-being")
-PC   <- paste0("pc", 1:10)
+               "PGI risk propensity")
+PC   <- paste0("pc", 1:20)
 
 # Ascribed characteristics
 ASCRIBED <- c("sex", "birth_year", "mother_age_birth", "birth_order", PC)
@@ -151,7 +151,7 @@ choose_parent_year <- function(parent_by, other_by) {
 
 
 #-------------- Function to compute the main indexes 
-compute_indexes <- function(outcome, data, natural_talents, pgis=PGIs) {
+compute_indexes <- function(outcome, data, pgis=PGIs) {
   
   # ------- models specifications
   m0_vars <- "1"
@@ -163,15 +163,9 @@ compute_indexes <- function(outcome, data, natural_talents, pgis=PGIs) {
   obs_vars     <- paste(OBSERVED, collapse=" + ")
   
   # Combine variable sets together
-  if(natural_talents == "PGI") {
-    m1_vars <- paste0("(", pgi_vars, ")^2")
-    m2_vars <- paste0("(", pgi_vars, " + ", ascr_vars,")^2")
-    
-  } else if(natural_talents == "observed") {
-    m1_vars <- paste0("(", obs_vars, ")^2")
-    m2_vars <- paste0("(", obs_vars, "+", ascr_vars,")^2")
-  } else (print("select a valid definition of natural talents"))
-  
+  m1_vars <- paste0("(", pgi_vars, ")")
+  m2_vars <- paste0("(", pgi_vars, " + ", ascr_vars,")")
+
   
   # 1) NULL MODEL
   m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data)
@@ -241,8 +235,8 @@ est_fun <- function(family_ids, indices, outcome, natural_talents, pgis, full_da
 
   # Prepare formulas
   m0_vars      <- "1"
-  m1_vars <- paste0("(", pgi_vars, ")^2")
-  m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")^2")
+  m1_vars <- paste0("(", pgi_vars, ")")
+  m2_vars <- paste0("(", pgi_vars, "+", ascr_vars,")")
   
   # Compute the models and the statistics (similar to compute_indexes function)
   m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)

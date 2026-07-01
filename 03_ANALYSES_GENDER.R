@@ -16,7 +16,7 @@ outcome         <- "education"
 natural_talents <- "PGI"
 
 # Bootstrapping:
-n_boot <- 1000
+n_boot <- 500
 
 
 
@@ -83,7 +83,7 @@ mclapply(c(0,1), function(which_sex) {
   
   # ------- Compute indices for all outcomes
   print("compute main results")
-  final_results = compute_indexes(outcome, siblings, natural_talents)
+  final_results = compute_indexes(outcome, siblings)
   
   
   
@@ -113,7 +113,7 @@ mclapply(c(0,1), function(which_sex) {
   
   
   
-}, mc.cores=4) # end of sex loop
+}, mc.cores=2) # end of sex loop
 
 cat("Finished computation")
 

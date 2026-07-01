@@ -13,23 +13,74 @@ source("00_MASTER.R")
 
 ###### ------ CONFIG ----- #######
 
-# compute power analysis?
-compute      <- F
-# replications for null distribution
-n_null       <- 500
-# replications per power grid cell
-n_sim        <- 500
-# observed: all WLS sibling families have exactly 2 members
+dataset      <- "MOBA"            # "WLS" or "MOBA"
+compute      <- T
+n_null       <- 100
+n_sim        <- 100
 mean_sib     <- 2
-# PGI signal: TRUE = all in pgi_education; FALSE = equal across 7 PGIs
-concentrated <- T
+concentrated <- F
+samples      <- c("Sisters", "Brothers", "Pooled")
 
 # Grid of delta_within effect sizes to sweep
-delta_grid <- seq(0.01, 0.06, by = 0.01)
-n_pgis     <- length(PGIs)
+delta_grid <- if (dataset == "WLS") c(0.0001, 0.01, 0.015, 0.02, 0.025, 0.03, 0.04, 0.05, 0.06) else
+                                    c(0.0001, 0.001, 0.002, 0.005, 0.01, 0.02, 0.025, 0.03)
 
-# Where to run analysis
-samples <- c("Brothers", "Sisters")
+n_pgis <- length(PGIs)
+
+
+######################################################
+##########  DATASET-SPECIFIC SETUP  #################
+######################################################
+
+if (dataset == "WLS") {
+
+  sibs           <- readRDS("data/siblings_education.rds")
+  N_fam_brothers <- sibs |> group_by(familyID) |> filter(all(sex == 0)) |> pull(familyID) |> n_distinct()
+  N_fam_sisters  <- sibs |> group_by(familyID) |> filter(all(sex == 1)) |> pull(familyID) |> n_distinct()
+  N_fam_pooled   <- sibs |> pull(familyID) |> n_distinct()
+  n_fam_lookup   <- c(Brothers = N_fam_brothers, Sisters = N_fam_sisters, Pooled = N_fam_pooled)
+
+  xlsx_lookup <- c(
+    Brothers = "results/nointeractions/full_results_education_PGI_Brothers.xlsx",
+    Sisters  = "results/nointeractions/full_results_education_PGI_Sisters.xlsx",
+    Pooled   = "results/nointeractions/full_results_education_PGI.xlsx"
+  )
+
+  get_params <- function(sample_tag) {
+    results <- read_xlsx(xlsx_lookup[sample_tag], sheet = "Full results")
+    null    <- results[results$Model == "NULL MODEL",        ]
+    cond    <- results[results$Model == "CONDITIONAL MODEL", ]
+    list(icc          = null$emptyfam / null$totalvar,
+         delta_within = (null$emptyind - cond$condind) / null$totalvar)
+  }
+
+} else if (dataset == "MOBA") {
+
+  source("00a_MOBA_RESULTS.R")
+
+  vc_lookup <- list(
+    Brothers = moba_parents_brothers_full,
+    Sisters  = moba_parents_sisters_full,
+    Pooled = moba_parents_full
+  )
+
+  n_fam_lookup <- c(
+    Pooled   = 9501,
+    Brothers = 1605,
+    Sisters  = 3458
+  )
+
+  get_params <- function(sample_tag) {
+    vc_df <- vc_lookup[[sample_tag]]
+    null  <- vc_df[vc_df$Model == "NULL MODEL",        ]
+    cond  <- vc_df[vc_df$Model == "CONDITIONAL MODEL", ]
+    list(icc          = null$emptyfam / null$totalvar,
+         delta_within = (null$emptyind - cond$condind) / null$totalvar)
+  }
+
+} else {
+  stop(glue("Unknown dataset: '{dataset}'. Must be 'WLS' or 'MOBA'."))
+}
 
 
 ######################################################
@@ -120,7 +171,7 @@ fit_io_models <- function(df, n_pgis = 7) {
   pgi_vars  <- paste(pgi_names, collapse = " + ")
 
   f_m0 <- as.formula(paste("E ~ 1 +", famID))
-  f_m1 <- as.formula(paste("E ~", paste0("(", pgi_vars, ")^2"), "+", famID))
+  f_m1 <- as.formula(paste("E ~", paste0("(", pgi_vars, ")"), "+", famID))
 
   m0 <- suppressWarnings(lmer(f_m0, data = df, REML = TRUE))
   m1 <- suppressWarnings(lmer(f_m1, data = df, REML = TRUE))
@@ -170,34 +221,9 @@ run_sim_cell <- function(n_families, delta_within,
 ##########  RUN POWER ANALYSIS  #####################
 ######################################################
 
-# ------ PARAMETERS CALIBRATED FROM DATA ------
-
-sibs           <- readRDS("data/siblings_education.rds")
-N_fam_brothers <- sibs |> group_by(familyID) |> filter(all(sex == 0)) |> pull(familyID) |> n_distinct()
-N_fam_sisters  <- sibs |> group_by(familyID) |> filter(all(sex == 1)) |> pull(familyID) |> n_distinct()
-N_fam_pooled   <- sibs |> pull(familyID) |> n_distinct()
-n_fam_lookup   <- c(Brothers = N_fam_brothers, Sisters = N_fam_sisters, Pooled = N_fam_pooled)
-
-xlsx_lookup <- c(
-  Brothers = "results/by_outcome/full_results_education_PGI_Brothers.xlsx",
-  Sisters  = "results/by_outcome/full_results_education_PGI_Sisters.xlsx",
-  Pooled   = "results/by_outcome/full_results_education_PGI.xlsx"
-)
-
-read_vc_params <- function(path) {
-  results <- read_xlsx(path, sheet = "Full results")
-  null    <- results[results$Model == "NULL MODEL",        ]
-  cond    <- results[results$Model == "CONDITIONAL MODEL", ]
-  list(icc          = null$emptyfam / null$totalvar,
-       delta_within = (null$emptyind - cond$condind) / null$totalvar)
-}
-
-
-# ------ LOOP OVER ALL SAMPLES ------
-
 for (sample_tag in samples) {
 
-  params         <- read_vc_params(xlsx_lookup[sample_tag])
+  params         <- get_params(sample_tag)
   n_families     <- n_fam_lookup[sample_tag]
   icc_obs        <- params$icc
   delta_observed <- params$delta_within
@@ -207,8 +233,8 @@ for (sample_tag in samples) {
 
   # tags to identify analysis
   conc_tag <- ifelse(concentrated, "concentrated", "equal")
-  tag      <- glue("{conc_tag}_{sample_tag}_{n_sim}")
-  null_tag <- glue("{conc_tag}_{sample_tag}_{n_sim}_Null")
+  tag      <- glue("{dataset}_{conc_tag}_{sample_tag}_{n_sim}")
+  null_tag <- glue("{dataset}_{conc_tag}_{sample_tag}_{n_sim}_Null")
 
   ######################################################
   ##########  STEP 4: NULL DISTRIBUTION  ##############
@@ -283,8 +309,8 @@ for (sample_tag in samples) {
              label = glue("observed = {round(delta_observed, 3)}"), hjust = 0, size = 3, color = "red") +
     scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
     labs(
-      title = glue("Power to detect within-family PGI variance reduction - {sample_tag} (N families={n_families})"),
-      x     = "True delta_within = (emptyind - condind) / totalvar",
+      #title = glue("Power to detect within-family PGI variance reduction - {sample_tag} (N families={n_families})"),
+      x     = "Variance explained by PGIs within family",
       y     = "Power (one-sided, alpha = 0.05)"
     ) +
     theme_bw(base_size = 11)
@@ -296,6 +322,6 @@ for (sample_tag in samples) {
                label = glue("detectable = {round(det_delta, 3)}"), hjust = 0, size = 3, color = "steelblue")
 
   print(p)
-  ggsave(glue("PowerAnalysis/plots/power_d_{tag}.png"), p, width = 8, height = 5)
-  cat(glue("Plot saved: PowerAnalysis/plots/power_d_{tag}.png\n"))
+  ggsave(glue("PowerAnalysis/plots/power_d_{tag}.pdf"), p, width = 8, height = 5)
+  cat(glue("Plot saved: PowerAnalysis/plots/power_d_{tag}.pdf\n"))
 }

@@ -14,10 +14,11 @@ source("00_MASTER.R")
 # Compute for desired outcomes and natural talents, even only one
 outcome         <- "education"
 natural_talents <- "PGI"
+dataset <- "WLS"
 
-# Bootstrapping iterations:
-n_boot  <- 1000
-
+# If dataset = WLS
+n_boot  <- 500
+compute <- T
 
 
 
@@ -36,68 +37,62 @@ siblings <- siblings %>%
 
 
 
-
-
-## == For each PGI:
-mclapply(PGIs, function(pgi) {
+if (compute) {
+  
+  
+  ## == For each PGI:
+  mclapply(PGIs, function(pgi) {
+      
     
-
-  ######################## FULL CALCULATIONS ##############################
+    ##################### CONFIDENCE INTERVALS ############################
+    
+    # ------- Run bootstrapping
+    print("compute bootstrapping")
+    ci_summary = compute_indexes_bootstrap(siblings, n_boot, outcome, pgi)
+    
+    ## Add PGI column
+    ci_summary <- ci_summary %>% mutate(PGI = pgi)
+    
+    
+    ##################### SAVE RESULTS ############################
+    
+    # Create a new Excel workbook
+    wb <- createWorkbook()
+    
+    # Add confidence intervals sheet
+    addWorksheet(wb, "For plotting")
+    writeData(wb, "For plotting", ci_summary)
+    
+    # Save the workbook to an Excel file
+    saveWorkbook(wb, paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_",pgi,".xlsx"), overwrite = T)
   
-  # ------- Compute indices for all outcomes
-  print("compute main results")
-  final_results = compute_indexes(outcome, siblings, natural_talents, pgi)
-  
-  
-  
-  ##################### CONFIDENCE INTERVALS ############################
-  
-  
-  # ------- Run bootstrapping
-  print("compute bootstrapping")
-  ci_summary = compute_indexes_bootstrap(siblings, n_boot, outcome, pgi)
-  
-  ## Add PGI column
-  ci_summary <- ci_summary %>% mutate(PGI = pgi)
-  
-  
-  ##################### SAVE RESULTS ############################
-  
-  # Create a new Excel workbook
-  wb <- createWorkbook()
-  
-  # Add results sheet
-  addWorksheet(wb, "Full results")
-  writeData(wb, "Full results", final_results)
-  
-  # Add confidence intervals sheet
-  addWorksheet(wb, "For plotting")
-  writeData(wb, "For plotting", ci_summary)
-  
-  # Save the workbook to an Excel file
-  saveWorkbook(wb, paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_",pgi,".xlsx"), overwrite = T)
-
-  
-}, mc.cores = 3)
+    
+  }, mc.cores = 3)
 
 
+}
 
 
 # ================= PLOT ================= #
 
 
 # read
-data <- map_df(PGIs, function(pgi) {
-  readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_",pgi,".xlsx"), sheet = "For plotting")
-})
+
+if (dataset == "WLS") {
+  data <- map_df(PGIs, function(pgi) {
+    readWorkbook(paste0("results/by_outcome/full_results_",outcome,"_",natural_talents,"_",pgi,".xlsx"), sheet = "For plotting")
+  })
+} else if (dataset == "MOBA") {
+  source("00a_MOBA_RESULTS.R")
+  data <- moba_single_pgis
+}
 
 # Take out difference
 data <- data %>% filter(Index != "diff")
 
 # Custom order
 data$Index   <- factor(data$Index,   levels = INDICES)
-data$PGI  <- factor(data$PGI,
-                       levels = PGIs, labels = PGIs.labs)
+data$PGI  <- factor(data$PGI, levels = PGIs, labels = PGIs.labs)
 #data$Dataset <- factor(data$Dataset, levels = c("WLS","MoBa"))
 
 # Round for plotting
@@ -136,7 +131,7 @@ ggplot(data, aes(x = Outcome, y = Estimate, fill = Index)) +
   scale_fill_manual(labels = INDICES.labs, values=c("#F0B70F", "#7ABA3A", "#E83B3F"))
 
 # Save the plot
-ggsave(paste0("plots/by_PGI_WLS.pdf"), width = 12, height = 11)
+ggsave(glue("plots/by_PGI_{dataset}.pdf"), width = 12, height = 11)
 
 
 

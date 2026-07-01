@@ -174,7 +174,7 @@ select(data, contains("age_w")) %>% summary()
 # Mean   :53.66   Mean   :64.66   Mean   :71.66   Mean   : 80.66  
 # Max.   :75.00   Max.   :86.00   Max.   :93.00   Max.   :102.00  
 
-# Average over all available waves
+# Average over all available waves, max for education
 data <- data %>%
   mutate(
     grades          = grades_1,

@@ -16,7 +16,7 @@ outcome         <- "education"
 natural_talents <- "PGI"
   
 # Bootstrapping iterations:
-n_boot  <- 1000
+n_boot  <- 500
 
 
 
@@ -40,7 +40,7 @@ siblings <- siblings %>%
   
 # ------- Compute indices for all outcomes
 print("compute main results")
-final_results = compute_indexes(outcome, siblings, natural_talents)
+final_results = compute_indexes(outcome, siblings)
 
 
 

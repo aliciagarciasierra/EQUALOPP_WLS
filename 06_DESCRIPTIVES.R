@@ -7,8 +7,11 @@
 setwd("~/Library/CloudStorage/OneDrive-UniversitédeLausanne/UNIL/projects/GenesSkills/EQUALOPP_WLS")
 source("00_MASTER.R")
 
-outcome      <- "education"
+# MoBa
 moba_sample  <- "parents"   # "parents" or "children"
+
+# WLS
+outcome      <- "education"
 data         <- readRDS(paste0("data/siblings_",outcome,".rds"))
 
 
@@ -57,11 +60,11 @@ print(descriptive_stats_long)
 outcome         <- "education"
 natural_talents <- "PGI"
 
-# -- Complete sample results
+# Complete sample results
 results_all <- readRDS(paste0("results/results_",outcome,"_",natural_talents,"_",moba_sample,".rds")) %>%
   mutate(Sample = "Complete", Natural_Talents = natural_talents)
 
-# -- Gender results
+# Gender results
 results_sex <- readRDS(paste0("results/results_",outcome,"_",natural_talents,"_gender_",moba_sample,".rds")) %>%
   rename(Natural_Talents = ability)
 
@@ -69,30 +72,30 @@ results_sex <- readRDS(paste0("results/results_",outcome,"_",natural_talents,"_g
 results <- bind_rows(results_all, results_sex) 
 
 # Sort
-results <- results %>% 
-  mutate(Sample = factor(Sample,levels=c("Complete","Sisters","Brothers")))
+results <- results %>% mutate(Sample = factor(Sample,levels=c("Complete","Sisters","Brothers")))
 
-results <- results %>% select(-Upper, -Lower)
 
+# ======== Table 1 ======== #
+
+results_tab1 <- results %>% select(-Upper, -Lower)
 
 # Extract p-values and adjust
-pvalues <- results %>% 
+pvalues <- results_tab1 %>% 
   filter(Index=="diff") %>% 
   select(Dataset, Natural_Talents, Sample, pval) %>%
   mutate(pval.adj = p.adjust(pval, method="BH"),
          stars    = add_stars(pval.adj))
 
 # Reshape to wide format
-wide_df <- results %>%
+wide_df <- results_tab1 %>%
   select(-pval,-Outcome) %>%
   pivot_wider(names_from = Index, values_from = c(Estimate, SE), names_sep = "_")
 
 # Add back pvalues
 wide_df <- merge(wide_df, pvalues)
 
-
 # Reorder variables
-results_table <- wide_df %>% 
+results_table1 <- wide_df %>% 
   arrange(Dataset, Sample, Natural_Talents) %>%
   select(Dataset, Sample, N, Natural_Talents, 
          Estimate_Sibcorr, SE_Sibcorr, 
@@ -101,6 +104,27 @@ results_table <- wide_df %>%
          Estimate_diff, pval) %>%
   mutate_if(is.numeric, round, 2)
 
+results_table1
+
+
+# ======== Table with CIs ======== #
+
+# Reshape to wide format
+wide_df <- results %>%
+  select(-Outcome, -pval, -Natural_Talents, -SE) %>%
+  pivot_wider(names_from = Index, values_from = c(Estimate, Upper, Lower), names_sep = "_")
+
+# Reorder variables
+results_CIs <- wide_df %>% 
+  arrange(Dataset, Sample) %>%
+  select(Dataset, Sample, N, 
+         Estimate_Sibcorr, Lower_Sibcorr, Upper_Sibcorr,
+         Estimate_IOLIB,   Lower_IOLIB, Upper_IOLIB,
+         Estimate_IORAD,   Lower_IORAD, Upper_IORAD,
+         Estimate_diff,    Lower_diff, Upper_diff) %>%
+  mutate_if(is.numeric, round, 2)
+
+results_CIs
 
 
 ################################################################################

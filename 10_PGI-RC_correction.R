@@ -13,8 +13,10 @@ source("00_MASTER.R")
 
 outcome <- "education"
 pgis_rc <- c("pgi_education")
-n_boot  <- 1000
-compute <- F
+
+# if WLS also set:
+n_boot  <- 500
+compute <- T
 
 
 ## READ DATA ------------------------------------------------------------
@@ -144,8 +146,8 @@ cat("\n")
 #   B) Howe   h²_pop = 0.13;  h²_within directly from Howe (0.04)
 
 scenarios <- list(
-  A = list(rho_Between = rho_Between_Becker, rho_within  = rho_within_Becker),
-  B = list(rho_Between = rho_Between_Howe,   rho_within  = rho_within_Howe)
+  A = list(name = "Becker", rho_Between = rho_Between_Becker, rho_within  = rho_within_Becker),
+  B = list(name = "Howe",   rho_Between = rho_Between_Howe,   rho_within  = rho_within_Howe)
 )
 
 
@@ -165,8 +167,8 @@ est_fun_rc <- function(family_ids, indices, outcome, natural_talents, pgis, full
   pgi_vars  <- paste(pgis, collapse = " + ")
 
   m0_vars <- "1"
-  m1_vars <- paste0("(", pgi_vars, ")^2")
-  m2_vars <- paste0("(", pgi_vars, " + ", ascr_vars, ")^2")
+  m1_vars <- paste0("(", pgi_vars, ")")
+  m2_vars <- paste0("(", pgi_vars, " + ", ascr_vars, ")")
 
   m0 <- lmer(as.formula(paste(outcome, "~", m0_vars, famID)), data = data_sample)
   m1 <- lmer(as.formula(paste(outcome, "~", m1_vars, famID)), data = data_sample)
@@ -251,9 +253,8 @@ if (compute) {
     # Compute
     res_pci_rc <- compute_indexes_bootstrap_rc(siblings, n_boot, outcome, pgis_rc, s$rho_Between, s$rho_within)
     # Create tag
-    tag <- paste0("_nboot", n_boot, "_rhob", round(s$rho_Between, 3), "_rhow", round(s$rho_within, 3))
     # Save
-    saveRDS(res_pci_rc, paste0("results/results_",outcome,"_PGI_RC",tag,".rds"))
+    saveRDS(res_pci_rc, paste0("PGI-RC-correction/results/results_", outcome, "_PGI_RC_", s$name, ".rds"))
   }, mc.cores = 2)
 
 }
@@ -262,28 +263,30 @@ if (compute) {
 
 ## PLOT -----------------------------------------------------------------
 
-# Read results with Becker correction
-tag_Becker <- paste0("_nboot", n_boot, "_rhob", round(rho_Between_Becker, 3), "_rhow", round(rho_within_Becker, 3))
-ci_rc_Becker <- readRDS(paste0("results/results_", outcome, "_PGI_RC", tag_Becker, ".rds"))
+source("00a_MOBA_RESULTS.R")
 
-# Read results with Howe correction
-tag_Howe <- paste0("_nboot", n_boot, "_rhob", round(rho_Between_Howe, 3), "_rhow", round(rho_within_Howe, 3))
-ci_rc_Howe <- readRDS(paste0("results/results_", outcome, "_PGI_RC", tag_Howe, ".rds"))
+# WLS
+ci_rc_Becker <- readRDS(paste0("PGI-RC-correction/results/results_", outcome, "_PGI_RC_Becker.rds"))
+ci_rc_Howe   <- readRDS(paste0("PGI-RC-correction/results/results_", outcome, "_PGI_RC_Howe.rds"))
+original     <- readRDS(paste0("results/results_", outcome, "_PGI_parents.rds"))
 
-# Read non-corrected results
-original <- readRDS(paste0("results/results_", outcome, "_PGI_parents.rds")) 
-
-# Combine all
-plot_data <- bind_rows(
+wls_data <- bind_rows(
   original     %>% filter(Dataset == "WLS", Index != "diff") %>% mutate(Panel = "Original"),
-  ci_rc_Becker %>% filter(Index != "diff") %>% mutate(Dataset = "WLS", Panel = "Corrected (Becker - WLS)"),
-  ci_rc_Howe   %>% filter(Index != "diff") %>% mutate(Dataset = "WLS", Panel = "Corrected (Howe - MoBa)"),
+  ci_rc_Becker %>% filter(Index != "diff") %>% mutate(Panel = "Corrected (Becker et al.)"),
+  ci_rc_Howe   %>% filter(Index != "diff") %>% mutate(Panel = "Corrected (Howe et al.)"),
 ) %>%
   mutate(
-    Index = factor(Index, levels = INDICES),
-    Panel = factor(Panel, levels = c("Original", "Corrected (Becker - WLS)","Corrected (Howe - MoBa)"))
+    Dataset = "WLS",
+    Index   = factor(Index, levels = INDICES),
+    Panel   = factor(Panel, levels = c("Original", "Corrected (Becker et al.)", "Corrected (Howe et al.)"))
   ) %>%
   mutate_if(is.numeric, round, 2)
+
+moba_data <- moba_pgi_rc %>% mutate(Dataset = "MoBa")
+
+plot_data <- bind_rows(wls_data, moba_data) %>%
+  mutate(Dataset = factor(Dataset, levels = c("WLS", "MoBa")))
+
 
 # Plot resulting indices
 ggplot(plot_data, aes(x = Outcome, y = Estimate, fill = Index)) +
@@ -294,8 +297,8 @@ ggplot(plot_data, aes(x = Outcome, y = Estimate, fill = Index)) +
   geom_text(aes(label = Estimate, y = Upper),
             position = position_dodge(width = 0.7),
             vjust = -1, size = 5) +
-  labs(x = " ", y = "Inequality of Opportunity in Education (WLS) \n") +
-  facet_wrap(~Panel, nrow = 1) +
+  labs(x = " ", y = "Inequality of Opportunity in Education \n") +
+  facet_grid(Dataset ~ Panel) +
   guides(fill = guide_legend(nrow = 1, byrow = FALSE, title = NULL,
                              keywidth = 1.2, keyheight = 1.2, default.unit = "cm")) +
   theme_bw(base_size = 22) +
@@ -314,73 +317,72 @@ ggplot(plot_data, aes(x = Outcome, y = Estimate, fill = Index)) +
   scale_y_continuous(limits = c(0, 0.7), expand = expansion(mult = c(0, 0))) +
   scale_fill_manual(labels = INDICES.labs, values = c("#F0B70F", "#7ABA3A", "#E83B3F"))
 
-ggsave(paste0("PGI-PC-correction/plots/PGI_RC_correction_WLS.png"), width = 12, height = 8)
+ggsave("PGI-RC-correction/plots/PGI_RC_correction.pdf", width = 12, height = 10)
 
 
 
-## CHECK -----------------------------------------------------------------
+## CHECK WLS -----------------------------------------------------------------
 
-# Population-rho correction of RAD-LIB gap = ρ²_pop × (IORad − IOLib)
-# Three sources for ρ_pop:
-#   (1) Becker reported: ρ = 1.649 (Supp. Table 4, WLS-specific)
-#   (2) Becker h²_pop + our R²_pop: ρ = sqrt(h²_pop_Becker / r2_pop_implied)
-#   (3) Howe   h²_pop + our R²_pop: ρ = sqrt(h²_pop_Howe   / r2_pop_implied)
-# Compare each corrected gap to our decomposed scenarios
-
-rho_pop_Becker_reported <- 1.649
-rho_pop_Becker_implied  <- sqrt(h2_pop_Becker / r2_pop_implied)
-rho_pop_Howe_implied    <- sqrt(h2_pop_Howe   / r2_pop_implied)
-
-# Original gap
-gap_obs <- original %>% filter(Index == "diff",Dataset == "WLS") %>% pull(Estimate)
-
-# Corrected gaps
-gap_Becker <- ci_rc_Becker %>% filter(Index == "diff") %>% pull(Estimate)
-gap_Howe   <- ci_rc_Howe %>%   filter(Index == "diff") %>% pull(Estimate)
-
-# All estimates
-check_data <- data.frame(
-  Method = factor(c(
-    "Observed",
-    "Single-rho: Becker (reported)",
-    "Single-rho: Becker (implied)",
-    "Decomposed: Becker h²",
-    "Single-rho: Howe (implied)",
-    "Decomposed: Howe h²"
-  ), levels = c(
-    "Observed",
-    "Single-rho: Becker (reported)",
-    "Single-rho: Becker (implied)",
-    "Decomposed: Becker h²",
-    "Single-rho: Howe (implied)",
-    "Decomposed: Howe h²"
-  )),
-  Gap = c(
-    round(gap_obs,2),
-    round(rho_pop_Becker_reported^2 * gap_obs,2),
-    round(rho_pop_Becker_implied^2  * gap_obs,2),
-    round(gap_Becker,2),
-    round(rho_pop_Howe_implied^2    * gap_obs,2),
-    round(gap_Howe,2)
-  ),
-  Source = c("Observed", "Becker (WLS)", "Becker (WLS)", "Becker (WLS)", "Howe (MoBa)", "Howe (MoBa)")
-)
-
-cat("\n--- Single-rho gap check ---\n")
-print(check_data)
-
-# Plot
-ggplot(check_data, aes(x = Gap, y = Method, colour = Source)) +
-  geom_vline(xintercept = round(gap_obs,2), linetype = "dashed", colour = "grey50") +
-  geom_point(size = 4) +
-  geom_text(aes(label = round(Gap, 3)), hjust = -0.3, size = 4.5) +
-  scale_colour_manual(values = c(Observed = "black", `Becker (WLS)` = "#E83B3F", `Howe (MoBa)` = "#7ABA3A")) +
-  labs(x = "Corrected gap (IORad - IOLib)", y = NULL,
-       title = "WLS Gap check: single-rho vs decomposed correction") +
-  theme_bw(base_size = 14) +
-  theme(legend.position = "right", panel.grid.minor = element_blank()) +
-  xlim(0, max(check_data$Gap) * 1.15)
-
-ggsave(paste0("PGI-PC-correction/plots/PGI_RC_gap_check_WLS.png"), 
-       width = 9, height = 5)
-
+## Population-rho correction of RAD-LIB gap = ρ²_pop × (IORad − IOLib)
+## Three sources for ρ_pop:
+##   (1) Becker reported: ρ = 1.649 (Supp. Table 4, WLS-specific)
+##   (2) Becker h²_pop + our R²_pop: ρ = sqrt(h²_pop_Becker / r2_pop_implied)
+##   (3) Howe   h²_pop + our R²_pop: ρ = sqrt(h²_pop_Howe   / r2_pop_implied)
+## Compare each corrected gap to our decomposed scenarios
+#
+#rho_pop_Becker_reported <- 1.649
+#rho_pop_Becker_implied  <- sqrt(h2_pop_Becker / r2_pop_implied)
+#rho_pop_Howe_implied    <- sqrt(h2_pop_Howe   / r2_pop_implied)
+#
+## Original gap
+#gap_obs <- original %>% filter(Index == "diff",Dataset == "WLS") %>% pull(Estimate)
+#
+## Corrected gaps
+#gap_Becker <- ci_rc_Becker %>% filter(Index == "diff") %>% pull(Estimate)
+#gap_Howe   <- ci_rc_Howe %>%   filter(Index == "diff") %>% pull(Estimate)
+#
+## All estimates
+#check_data <- data.frame(
+#  Method = factor(c(
+#    "Observed",
+#    "Single-rho: Becker (reported)",
+#    "Single-rho: Becker (implied)",
+#    "Decomposed: Becker h²",
+#    "Single-rho: Howe (implied)",
+#    "Decomposed: Howe h²"
+#  ), levels = c(
+#    "Observed",
+#    "Single-rho: Becker (reported)",
+#    "Single-rho: Becker (implied)",
+#    "Decomposed: Becker h²",
+#    "Single-rho: Howe (implied)",
+#    "Decomposed: Howe h²"
+#  )),
+#  Gap = c(
+#    round(gap_obs,2),
+#    round(rho_pop_Becker_reported^2 * gap_obs,2),
+#    round(rho_pop_Becker_implied^2  * gap_obs,2),
+#    round(gap_Becker,2),
+#    round(rho_pop_Howe_implied^2    * gap_obs,2),
+#    round(gap_Howe,2)
+#  ),
+#  Source = c("Observed", "Becker (WLS)", "Becker (WLS)", "Becker (WLS)", "Howe (MoBa)", "Howe (MoBa)")
+#)
+#
+#cat("\n--- Single-rho gap check ---\n")
+#print(check_data)
+#
+## Plot
+#ggplot(check_data, aes(x = Gap, y = Method, colour = Source)) +
+#  geom_vline(xintercept = round(gap_obs,2), linetype = "dashed", colour = "grey50") +
+#  geom_point(size = 4) +
+#  geom_text(aes(label = round(Gap, 3)), hjust = -0.3, size = 4.5) +
+#  scale_colour_manual(values = c(Observed = "black", `Becker (WLS)` = "#E83B3F", `Howe (MoBa)` = "#7ABA3A")) +
+#  labs(x = "Corrected gap (IORad - IOLib)", y = NULL,
+#       title = "WLS Gap check: single-rho vs decomposed correction") +
+#  theme_bw(base_size = 14) +
+#  theme(legend.position = "right", panel.grid.minor = element_blank()) +
+#  xlim(0, max(check_data$Gap) * 1.15)
+#
+#ggsave("PGI-RC-correction/plots/PGI_RC_gap_check_WLS.png", width = 9, height = 5)
+#
